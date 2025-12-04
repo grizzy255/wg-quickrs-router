@@ -42,3 +42,13 @@ pub fn shell_cmd(args: &[&str]) -> ShellResult<Output> {
 
     Ok(output)
 }
+
+/// Parse comma-separated LAN CIDRs into a vector
+/// Supports formats like "192.168.1.0/24" or "192.168.1.0/24,10.0.0.0/8"
+pub fn parse_lan_cidrs(lan_cidr: &str) -> Vec<String> {
+    lan_cidr
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}

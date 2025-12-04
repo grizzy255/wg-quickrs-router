@@ -5,7 +5,7 @@
 // - STEP 4: Create peer-specific routing tables
 // - STEP 7: Policy-based routing for overlapping destinations
 
-use crate::helpers::shell_cmd;
+use crate::helpers::{shell_cmd, parse_lan_cidrs};
 use super::persist::{load_mode_state, save_mode_state};
 use super::mode::SystemMode;
 use thiserror::Error;
@@ -34,16 +34,6 @@ pub enum PolicyRoutingError {
 
 // Cached LAN interface (lazy initialization)
 static LAN_INTERFACE_CACHE: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
-
-/// Parse comma-separated LAN CIDRs into a vector
-/// Supports formats like "192.168.1.0/24" or "192.168.1.0/24,10.0.0.0/8"
-fn parse_lan_cidrs(lan_cidr: &str) -> Vec<String> {
-    lan_cidr
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
-}
 
 // Cached health status for exit nodes (updated by background monitor)
 static EXIT_NODE_HEALTH_CACHE: Lazy<Arc<RwLock<HashMap<Uuid, ExitNodeHealth>>>> = 
@@ -1464,7 +1454,7 @@ async fn check_peer_connectivity_async(peer_address: &str, wg_interface: &str) -
     }
     
     // If we got at least one successful ping, peer is online
-    if latencies.len() > 0 {
+    if !latencies.is_empty() {
         // Calculate average latency
         let sum: f64 = latencies.iter().sum();
         let avg = sum / latencies.len() as f64;

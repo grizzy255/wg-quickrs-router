@@ -1,26 +1,5 @@
 <template>
   <div class="flex flex-col">
-    <!-- Router Mode Toggle (moved to SystemHealthCard, but keeping this for backward compatibility if needed) -->
-    <div v-if="false" class="flex items-center justify-between mb-3">
-      <div v-if="mode === 'unknown'"
-           class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-yellow-500 cursor-pointer hover:bg-yellow-400"
-           title="Router Mode Status Unknown">
-        <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[7px] my-[2px] bg-white"></div>
-      </div>
-      <div v-else-if="mode === 'host'"
-           class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-gray-400 cursor-pointer hover:bg-gray-500"
-           title="Switch to Router Mode"
-           @click="handleToggle">
-        <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[2px] my-[2px] bg-white"></div>
-      </div>
-      <div v-else-if="mode === 'router'"
-           class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-blue-500 cursor-pointer hover:bg-blue-600"
-           title="Switch to Host Mode"
-           @click="handleToggle">
-        <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[12px] my-[2px] bg-white"></div>
-      </div>
-    </div>
-
     <!-- Exit Node (shown in Router Mode when peers have default routes) -->
     <div v-if="mode === 'router' && peersWithDefaultRoute.length > 0" class="space-y-2">
       <div class="text-sm text-secondary flex items-center gap-2">
@@ -167,13 +146,12 @@
 </template>
 
 <script>
-import { Server, Activity } from 'lucide-vue-next';
+import { Server } from 'lucide-vue-next';
 
 export default {
   name: "router-mode",
   components: {
-    Server,
-    Activity
+    Server
   },
   props: {
     mode: {
@@ -201,8 +179,7 @@ export default {
       selectedExitNode: null,
       loading: false,
       healthStatus: {},
-      healthPollInterval: null,
-      peerControlLoading: {}  // Track loading state per peer: { peerId: 'reconnect'|'stop'|'start' }
+      healthPollInterval: null
     }
   },
   watch: {

@@ -91,7 +91,7 @@
       <div v-if="wireguardStatus === 'up' && connectedPeers.length > 0">
         <div class="text-sm text-secondary flex items-center gap-2 mb-1">
           <Users :size="16" class="text-icon" />
-          Connected Peers:
+          Connected Peers
         </div>
         <div class="text-xs space-y-0.5 pl-6">
           <div v-for="peerId in connectedPeers" :key="peerId" 

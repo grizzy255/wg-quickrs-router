@@ -4,7 +4,7 @@
 // Responsibilities:
 // - STEP 2: Configure firewall rules for NAT/MASQUERADE and forwarding
 
-use crate::helpers::shell_cmd;
+use crate::helpers::{shell_cmd, parse_lan_cidrs};
 use crate::conf::util::get_config;
 use thiserror::Error;
 
@@ -18,15 +18,6 @@ pub enum FirewallError {
     ForwardingRuleError(String),
     #[error("Config error: {0}")]
     ConfigError(String),
-}
-
-/// Parse comma-separated LAN CIDRs into a vector
-fn parse_lan_cidrs(lan_cidr: &str) -> Vec<String> {
-    lan_cidr
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect()
 }
 
 // Enable Router Mode firewall rules
