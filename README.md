@@ -122,15 +122,56 @@ docker compose -f docker-compose.agent.yml up -d
 
 ### Manual Installation
 
+**Step 1: Download the binary**
 ```bash
-# Download and run installer
-curl -fsSL https://raw.githubusercontent.com/grizzy255/wg-quickrs-router/main/installer.sh | bash
+# Download latest release
+curl -L -o wg-quickrs https://github.com/grizzy255/wg-quickrs-router/releases/latest/download/wg-quickrs-linux-amd64
 
-# Initialize (web wizard)
+# Move to system path and make executable
+sudo mv wg-quickrs /usr/local/bin/
+sudo chmod +x /usr/local/bin/wg-quickrs
+
+# Verify installation
+wg-quickrs --version
+```
+
+**Step 2: Initialize (web wizard)**
+```bash
 wg-quickrs agent init --web-init
+```
+Access http://your-server:8080 and complete the setup wizard.
 
-# Run the agent
-wg-quickrs agent run --config /etc/wireguard/wg-quickrs.yaml
+**Step 3: Create systemd service**
+```bash
+sudo tee /etc/systemd/system/wg-quickrs.service > /dev/null << 'EOF'
+[Unit]
+Description=wg-quickrs WireGuard Gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/wg-quickrs agent run --config /etc/wireguard/wg-quickrs.yaml
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+**Step 4: Enable and start the service**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable wg-quickrs
+sudo systemctl start wg-quickrs
+
+# Check status
+sudo systemctl status wg-quickrs
+
+# View logs
+sudo journalctl -u wg-quickrs -f
 ```
 
 ---
