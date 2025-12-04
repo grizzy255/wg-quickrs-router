@@ -1,65 +1,188 @@
-# wg-quickrs
+# wg-quickrs (Gateway Edition)
 
-> **🆕 What's New**
-> 
-> - **Router Mode** - Transform your host into a VPN gateway with exit node selection
-> - **Per-Peer LAN Access Control** - Allow/deny individual peers access to your local network
-> - **Multiple LAN Subnet Support** - Configure multiple comma-separated CIDRs for LAN access rules
-> - **Real-time Health Monitoring** - Live latency, packet loss, and jitter metrics for exit nodes
-> - **Web-based Initialization Wizard** - Configure everything from the browser on first run
-> - **Enhanced Traffic Analysis** - Improved graphs with tooltips and timeline markers
-> - **Redesigned Dashboard** - Three-card layout: System Health, Control Center, and Gateway Status
+> 🔀 A WireGuard management tool with Router Mode for CGNAT/cellular peers
+
+**Forked from [GodOfKebab/wg-quickrs](https://github.com/GodOfKebab/wg-quickrs)**
 
 ---
 
-[![License](https://img.shields.io/github/license/godofkebab/wg-quickrs?logo=GitHub&color=brightgreen)](https://github.com/GodOfKebab/wg-quickrs)
-![Static Badge](https://img.shields.io/badge/amd64%20%7C%20arm64%20%7C%20arm%2Fv7%20%20-%20grey?label=arch)
-![Static Badge](https://img.shields.io/badge/Linux%20%7C%20macOS%20%20-%20black?label=platform)
+## 🆕 What's New in This Fork
 
-[![Release](https://img.shields.io/github/v/tag/godofkebab/wg-quickrs?logo=github&label=latest%20tag&color=blue)](https://github.com/godofkebab/wg-quickrs/releases/latest)
-[![Docker](https://img.shields.io/docker/image-size/godofkebab/wg-quickrs?logo=docker&color=%232496ED)](https://hub.docker.com/repository/docker/godofkebab/wg-quickrs)
-[![Docker](https://img.shields.io/docker/pulls/godofkebab/wg-quickrs?logo=docker&color=%232496ED)](https://hub.docker.com/repository/docker/godofkebab/wg-quickrs/tags)
-![Dynamic TOML Badge](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FGodOfKebab%2Fwg-quickrs%2Frefs%2Fheads%2Fmain%2Fsrc%2Fwg-quickrs%2FCargo.toml&query=package.rust-version&logo=rust&label=rust&color=%23000000)
-![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FGodOfKebab%2Fwg-quickrs%2Frefs%2Fheads%2Fmain%2Fsrc%2Fwg-quickrs-web%2Fpackage.json&query=dependencies.vue&logo=vue.js&label=vue&color=%234FC08D)
-
-✨ An intuitive multi-peer `wg` wrapper written in 🦀 Rust (`wg-quick` alternative).
-
-⚡ Rust + Vue + WASM + WireGuard = 🧪 one [static binary](docs/notes/static-binary.md) + 📝 one [YAML file](docs/notes/schema.md) to rule them all 🪄
-
-Run it on your [router](docs/quick-start/router.md), [server](docs/quick-start/server.md), or [docker host](docs/quick-start/docker.md) and manage your WireGuard VPN from a [terminal](docs/quick-start/cli.md) or a web interface.
-
-<p align="center">
-  <img src="https://yasar.idikut.cc/project-assets/wg-quickrs-speedtest.gif" alt="speedtest demo">
-</p>
-
-<p align="center">
-  <img src="https://yasar.idikut.cc/project-assets/wg-quickrs-demo.gif" alt="usage demo">
-</p>
-
-Features:
-- Interactive graph to configure your P2P network
-- HTTPS support and password login with JWT-based API authentication
-- Automatic firewall/NAT setup (`iptables` for Debian/Linux or `pf` for macOS, both usually come preinstalled with the OS)
-- **Router Mode** with exit node selection - route all traffic through a remote peer
-- **Per-peer LAN access control** - selectively allow/deny peers access to your local network
-- **Real-time traffic analysis** with bandwidth graphs
-- **Web-based initialization wizard** - configure everything from the browser
-- If you are not feeling like dealing with VPN/networking on your machine, you can also just use the CLI or the web console to create `.conf` files/QR codes for your network peers.
+| Feature | Description |
+|---------|-------------|
+| **Router Mode** | Transform your host into a VPN gateway with exit node selection |
+| **Per-Peer LAN Access** | Toggle LAN access on/off for individual peers |
+| **Multi-CIDR Support** | Configure multiple LAN subnets (comma-separated) |
+| **Health Monitoring** | Real-time latency, packet loss, and jitter metrics |
+| **Web Init Wizard** | Browser-based first-time setup |
+| **Redesigned Dashboard** | Three-card layout: System Health, Control Center, Gateway Status |
 
 ---
 
-## Quick Start
+## 🎯 Problem Statement
 
-To get started, see quick start guides for [routers](docs/quick-start/router.md), [servers](docs/quick-start/server.md), or [docker hosts](docs/quick-start/docker.md).
+We faced an infrastructure challenge where remote peers were behind **CGNAT** (Carrier-Grade NAT) or cellular networks (LTE/Starlink), making them unreachable from the outside.
 
-## Router Mode
+### Why Standard Solutions Failed
 
-Router Mode transforms your wg-quickrs host into a VPN gateway, allowing connected peers to route their internet traffic through a remote exit node.
+| Approach | Problem |
+|----------|---------|
+| **Client Mode** | Gateway can't dial peers — they have no public IP |
+| **Server Mode (UniFi, etc.)** | Peers can connect, but no granular Policy-Based Routing to control where traffic goes |
 
-**Features:**
-- **Exit Node Selection** - Choose which peer to route traffic through
-- **LAN Access Control** - Per-peer toggle to allow/deny access to your local network (supports multiple LAN subnets)
-- **Health Monitoring** - Real-time latency, packet loss, and jitter metrics for the exit node
-- **Automatic Routing** - Policy-based routing (PBR) with automatic iptables/firewall rule management
+**We needed:** A solution that accepts incoming connections from hidden peers while providing advanced routing logic.
 
-See [Router Mode Guide](docs/notes/router-mode.md) for detailed configuration.
+---
+
+## 🛠️ The Solution
+
+**wg-quickrs Gateway Edition** acts as a central intelligent rendezvous point.
+
+Deploy on a Linux host with a public IP (or port forwarding) to:
+
+1. **Bypass CGNAT** — Peers initiate outbound connections to this server
+2. **Granular PBR** — Define per-peer routing rules (exit nodes, backup servers, etc.)
+3. **LAN Bridging** — Automatic iptables masquerading to bridge peers into internal subnets
+4. **Access Control** — Allow or deny LAN access per peer
+
+```
+┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
+│  Peer behind    │────▶│   wg-quickrs         │────▶│  Exit Node /    │
+│  CGNAT/LTE      │     │   Gateway            │     │  LAN Resources  │
+└─────────────────┘     │                      │     └─────────────────┘
+                        │  • Router Mode       │
+┌─────────────────┐     │  • PBR Engine        │     ┌─────────────────┐
+│  Starlink Peer  │────▶│  • LAN Access Ctrl   │────▶│  Backup Server  │
+└─────────────────┘     │  • Health Monitor    │     └─────────────────┘
+                        └──────────────────────┘
+```
+
+---
+
+## ✨ Features
+
+### Core WireGuard Management
+- **Multi-peer support** — Manage unlimited peers from one interface
+- **Interactive network graph** — Visual P2P network topology
+- **QR codes & .conf export** — Easy peer provisioning
+- **HTTPS & JWT auth** — Secure web access with password login
+
+### Router Mode (This Fork)
+- **Exit node selection** — Route all peer traffic through a selected peer
+- **Per-peer LAN access** — Toggle home icon to allow/deny LAN access
+- **Multiple LAN subnets** — Comma-separated CIDRs (e.g., `192.168.1.0/24, 10.0.0.0/8`)
+- **Persistent settings** — LAN access survives peer reconnects
+
+### Monitoring & Dashboard
+- **Real-time health metrics** — Latency, packet loss, jitter
+- **Traffic graphs** — Enhanced with tooltips and grid lines
+- **Three-card layout:**
+  - System Health & Info (status, tunnel IP, LAN subnets)
+  - Control Center (toggles, connected peers with controls)
+  - Gateway Status (exit node health, uptime, endpoint)
+
+---
+
+## 🚀 Quick Start
+
+### Docker (Recommended)
+
+**Step 1: Initialize**
+```bash
+docker compose -f docker-compose.init.yml up
+```
+Access http://your-server:8080 and complete the web wizard.
+
+**Step 2: Run the Agent**
+```bash
+docker compose -f docker-compose.agent.yml up -d
+```
+
+### Manual Installation
+
+```bash
+# Download and run installer
+curl -fsSL https://raw.githubusercontent.com/grizzy255/wg-quickrs-router/main/installer.sh | bash
+
+# Initialize (web wizard)
+wg-quickrs agent init --web-init
+
+# Run the agent
+wg-quickrs agent run --config /etc/wireguard/wg-quickrs.yaml
+```
+
+---
+
+## 🔧 Router Mode Usage
+
+### Enable Router Mode
+1. Open the web dashboard
+2. Toggle **Router Mode** in the Control Center card
+3. Enter your LAN subnet(s): `192.168.1.0/24` or `192.168.1.0/24, 10.0.0.0/8`
+
+### Select Exit Node
+1. In **Gateway Status** card, click dropdown
+2. Select an online peer as exit node
+3. All peer traffic routes through the selected exit
+
+### Control LAN Access
+1. In **Control Center** → Connected Peers
+2. Click the 🏠 home icon to toggle LAN access per peer
+3. Red = denied, default = allowed
+
+---
+
+## 📁 Configuration
+
+Configuration stored in `/etc/wireguard/wg-quickrs.yaml`:
+
+```yaml
+interface:
+  name: WireStream
+  address: 10.100.105.1/24
+  port: 51822
+  private_key: <generated>
+
+peers:
+  - name: exit-node-1
+    public_key: <key>
+    endpoint: 1.2.3.4:51820
+    allowed_ips: 0.0.0.0/0
+    
+  - name: mobile-peer
+    public_key: <key>
+    # No endpoint - peer dials in (CGNAT)
+    allowed_ips: 10.100.105.2/32
+```
+
+Router Mode state persisted in `/var/lib/wg-quickrs/router_mode_state.json`.
+
+---
+
+## 🔒 Security Notes
+
+- Web interface protected by password + JWT tokens
+- HTTPS support available (see docs)
+- LAN access denied peers can still reach other WireGuard peers
+- Firewall rules managed automatically via iptables
+
+---
+
+## 📚 Documentation
+
+- [Docker Setup](docs/quick-start/docker.md)
+- [Server Installation](docs/quick-start/server.md)
+- [Router Mode Details](docs/notes/router-mode.md)
+
+---
+
+## 🙏 Credits
+
+- Original project: [GodOfKebab/wg-quickrs](https://github.com/GodOfKebab/wg-quickrs)
+- Built with Rust, Vue.js, and WireGuard
+
+---
+
+## 📄 License
+
+GPL-3.0 — See [LICENSE.txt](LICENSE.txt)
