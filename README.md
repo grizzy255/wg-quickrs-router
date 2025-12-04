@@ -10,7 +10,9 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Router Mode** | Transform your host into a VPN gateway with exit node selection |
+| **Router Mode** | Transform your host into a VPN gateway with dynamic exit node selection |
+| **Exit Node Capability** | Any peer can become an exit node — route traffic through remote locations |
+| **Per-Peer Routing Tables** | Each peer gets its own routing table with overlapping route support |
 | **Per-Peer LAN Access** | Toggle LAN access on/off for individual peers |
 | **Multi-CIDR Support** | Configure multiple LAN subnets (comma-separated) |
 | **Health Monitoring** | Real-time latency, packet loss, and jitter metrics |
@@ -41,20 +43,39 @@ We faced an infrastructure challenge where remote peers were behind **CGNAT** (C
 Deploy on a Linux host with a public IP (or port forwarding) to:
 
 1. **Bypass CGNAT** — Peers initiate outbound connections to this server
-2. **Granular PBR** — Define per-peer routing rules (exit nodes, backup servers, etc.)
-3. **LAN Bridging** — Automatic iptables masquerading to bridge peers into internal subnets
-4. **Access Control** — Allow or deny LAN access per peer
+2. **Granular PBR** — Per-peer routing tables with overlapping route support
+3. **Exit Node Selection** — Route traffic through any connected peer dynamically
+4. **LAN Bridging** — Automatic iptables masquerading to bridge peers into internal subnets
+5. **Access Control** — Allow or deny LAN access per peer
 
 ```
-┌─────────────────┐     ┌──────────────────────┐     ┌─────────────────┐
-│  Peer behind    │────▶│   wg-quickrs         │────▶│  Exit Node /    │
-│  CGNAT/LTE      │     │   Gateway            │     │  LAN Resources  │
-└─────────────────┘     │                      │     └─────────────────┘
-                        │  • Router Mode       │
-┌─────────────────┐     │  • PBR Engine        │     ┌─────────────────┐
-│  Starlink Peer  │────▶│  • LAN Access Ctrl   │────▶│  Backup Server  │
-└─────────────────┘     │  • Health Monitor    │     └─────────────────┘
-                        └──────────────────────┘
+                                                    ┌─────────────────────┐
+                                               ┌───▶│  Exit Node Peer 1   │───▶ Internet
+                                               │    │  (Home/Office)      │     (via Peer 1 IP)
+                                               │    └─────────────────────┘
+┌─────────────────┐                            │
+│  iPhone         │──┐                         │
+│  (CGNAT/LTE)    │  │    ┌────────────────────┴───┐
+└─────────────────┘  │    │                        │
+                     ├───▶│   wg-quickrs Gateway   │
+┌─────────────────┐  │    │                        │
+│  Laptop         │──┤    │  • Per-peer route table│
+│  (Starlink)     │  │    │  • Exit node selector  │    ┌─────────────────────┐
+└─────────────────┘  │    │  • LAN access control  │───▶│  LAN Resources      │
+                     │    │  • Health monitoring   │    │  192.168.1.0/24     │
+┌─────────────────┐  │    │                        │    │  10.0.0.0/8         │
+│  Remote Site    │──┘    └────────────────────┬───┘    └─────────────────────┘
+│  (Branch Office)│                            │
+└─────────────────┘                            │    ┌─────────────────────┐
+                                               └───▶│  Exit Node Peer 2   │───▶ Internet
+                                                    │  (Datacenter/VPS)   │     (via Peer 2 IP)
+                                                    └─────────────────────┘
+
+Traffic Flow Examples:
+  • iPhone → Gateway → Exit Peer 1 → Internet (appears as Peer 1's IP)
+  • Laptop → Gateway → Exit Peer 2 → Internet (appears as Peer 2's IP)
+  • Remote Site → Gateway → LAN Resources (if LAN access enabled)
+  • Any peer can be dynamically selected as exit node from the dashboard
 ```
 
 ---
@@ -68,10 +89,12 @@ Deploy on a Linux host with a public IP (or port forwarding) to:
 - **HTTPS & JWT auth** — Secure web access with password login
 
 ### Router Mode (This Fork)
-- **Exit node selection** — Route all peer traffic through a selected peer
+- **Exit node selection** — Route all peer traffic through a selected peer dynamically
+- **Per-peer routing tables** — Each peer gets an isolated routing table (avoids conflicts)
+- **Overlapping route support** — Multiple 0.0.0.0/0 routes coexist in separate tables
 - **Per-peer LAN access** — Toggle home icon to allow/deny LAN access
 - **Multiple LAN subnets** — Comma-separated CIDRs (e.g., `192.168.1.0/24, 10.0.0.0/8`)
-- **Persistent settings** — LAN access survives peer reconnects
+- **Persistent settings** — LAN access and exit node selection survive restarts
 
 ### Monitoring & Dashboard
 - **Real-time health metrics** — Latency, packet loss, jitter
@@ -124,6 +147,23 @@ wg-quickrs agent run --config /etc/wireguard/wg-quickrs.yaml
 1. In **Gateway Status** card, click dropdown
 2. Select an online peer as exit node
 3. All peer traffic routes through the selected exit
+4. Switch exit nodes on-the-fly without disconnecting peers
+
+### How Per-Peer Routing Works
+Each connected peer is assigned its own Linux routing table (table IDs 1000+). This enables:
+- **Overlapping routes** — Multiple peers can have `0.0.0.0/0` without conflicts
+- **Policy-Based Routing** — `ip rule` directs traffic based on source IP
+- **Dynamic switching** — Change exit nodes without tearing down tunnels
+
+```bash
+# Example: View routing tables created by wg-quickrs
+ip rule show
+# 1000: from 10.100.105.2 lookup 1000   ← iPhone's table
+# 1001: from 10.100.105.3 lookup 1001   ← Laptop's table
+
+ip route show table 1000
+# default via 10.100.105.10 dev wg0     ← Routes through Exit Peer 1
+```
 
 ### Control LAN Access
 1. In **Control Center** → Connected Peers
