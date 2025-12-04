@@ -130,9 +130,26 @@
       </div>
     </div>
 
-    </div><!-- End of dark mode wrapper -->
+    <!-- Footer -->
+    <footer class="bg-header border-t border-divider px-6 py-3 text-center text-secondary">
+      <small>
+        <a class="hover:underline" href="https://www.wireguard.com/" target="_blank">
+          "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
+        </a>
+      </small>
+      <br/>
+      <small>
+        <span>© 2025</span>
+        <strong>
+          <a class="hover:underline" href="https://github.com/grizzy255/wg-quickrs-router" target="_blank">wg-quickrs-router</a>
+        </strong>
+        <span class="mx-1">•</span>
+        <span>forked from</span>
+        <a class="hover:underline" href="https://github.com/GodOfKebab/wg-quickrs" target="_blank">GodOfKebab/wg-quickrs</a>
+      </small>
+    </footer>
 
-    <!-- Footer (removed version/build/copyright info) -->
+    </div><!-- End of dark mode wrapper -->
 
     <!-- Dialog: Ask Password -->
     <password-dialog v-if="api.does_need_auth"

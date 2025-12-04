@@ -25,7 +25,7 @@
     <div v-if="mode === 'router' && peersWithDefaultRoute.length > 0" class="space-y-2">
       <div class="text-sm text-secondary flex items-center gap-2">
         <Server :size="16" class="text-icon" />
-        Exit Node:
+        Exit Node
       </div>
       
       <!-- Single peer: Display read-only -->

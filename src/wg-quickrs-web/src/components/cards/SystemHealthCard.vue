@@ -39,7 +39,7 @@
         <div class="flex items-center justify-between">
           <span class="text-sm text-secondary flex items-center gap-2">
             <Globe :size="16" class="text-icon" />
-            Network Name:
+            Network Name
           </span>
           <span class="text-sm font-medium text-primary text-right">
             {{ network.name }}
@@ -48,7 +48,7 @@
         <div class="flex items-center justify-between">
           <span class="text-sm text-secondary flex items-center gap-2">
             <Home :size="16" class="text-icon" />
-            Tunnel IP:
+            Tunnel IP
           </span>
           <span class="text-sm font-medium text-primary text-right">
             {{ network.peers[network.this_peer].address }}
@@ -57,7 +57,7 @@
         <div class="flex items-center justify-between">
           <span class="text-sm text-secondary flex items-center gap-2">
             <Link :size="16" class="text-icon" />
-            Endpoint:
+            Endpoint
           </span>
           <span class="text-sm font-medium text-primary text-right">
             {{ stringifyEndpoint(network.peers[network.this_peer].endpoint) || 'N/A' }}
@@ -67,7 +67,7 @@
         <div v-if="routerMode === 'router'" class="flex items-center justify-between">
           <span class="text-sm text-secondary flex items-center gap-2">
             <Network :size="16" class="text-icon" />
-            LAN Subnet:
+            LAN Subnet
           </span>
           <div class="flex items-center gap-1.5">
             <span v-if="!isEditingLan" class="text-sm font-medium text-primary text-right">
