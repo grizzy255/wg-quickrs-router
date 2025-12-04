@@ -1,5 +1,5 @@
 <template>
-  <span class="text-gray-800 flex items-center">
+  <span class="text-primary flex items-center">
     <strong class="text-lg mt-[1px]">{{ field }}</strong>
   </span>
 </template>

@@ -27,6 +27,30 @@ docker run --rm \
 
 ## 1.2 Initialize the agent
 
+You have two options to initialize your agent:
+
+### Option A: Web-based Initialization (Recommended)
+
+Start the agent without initialization - it will automatically show the web-based setup wizard:
+
+```bash
+docker run -d \
+  --name wg-quickrs-agent-run-cnt \
+  -v "$HOME/.wg-quickrs-docker:/app/.wg-quickrs" \
+  --cap-add NET_ADMIN \
+  --cap-add SYS_MODULE \
+  --sysctl net.ipv4.ip_forward=1 \
+  --sysctl net.ipv4.conf.all.src_valid_mark=1 \
+  -p 8080:80/tcp \
+  -p 51820:51820/udp \
+  godofkebab/wg-quickrs \
+  agent run
+```
+
+Then open your browser to `http://YOUR-SERVER:8080` and follow the setup wizard.
+
+### Option B: CLI-based Initialization
+
 Initialize your agent using the init command:
 
 ```bash
@@ -113,6 +137,20 @@ docker run --rm \
 
 ⚠️ Note: Keep in mind that the plaintext password might show up in the bash/zsh history.
 If you instead use the binaries instead of docker, `wg-quickrs config reset agent web password` prompts for the password interactively, which is safer.
+
+---
+
+## 1.5 Using Router Mode
+
+Once initialized, you can enable Router Mode via the web UI to route traffic through a remote exit node.
+
+**Requirements for Router Mode in Docker:**
+- `NET_ADMIN` capability (already included above)
+- `ip_forward=1` sysctl (already included above)
+
+See [Router Mode Guide](../notes/router-mode.md) for detailed configuration.
+
+---
 
 ### 2. Build the Docker images from source
 

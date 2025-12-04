@@ -24,17 +24,17 @@ export default class WireGuardHelper {
 
     static get_field_colors(is_new) {
         return {
-            unchanged: is_new ? 'enabled:bg-green-200' : 'bg-white',
-            changed: is_new ? 'enabled:bg-green-200' : 'enabled:bg-blue-200',
-            error: 'enabled:bg-red-200',
+            unchanged: is_new ? 'enabled:bg-badge-success-bg' : '',
+            changed: is_new ? 'enabled:bg-badge-success-bg' : 'enabled:bg-badge-info-bg',
+            error: 'enabled:bg-badge-error-bg',
         }
     }
 
     static get_div_colors(is_new) {
         return {
-            unchanged: is_new ? 'bg-green-100' : 'bg-green-50',
-            changed: is_new ? 'bg-green-100' : 'bg-blue-50',
-            error: 'bg-red-50',
+            unchanged: is_new ? 'border-badge-success-border' : 'border-divider',
+            changed: is_new ? 'border-badge-success-border' : 'border-badge-info-border',
+            error: 'border-badge-error-border',
         }
     }
 

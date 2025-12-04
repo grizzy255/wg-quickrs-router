@@ -130,5 +130,6 @@ src/target/
 
 .wg-quickrs
 .wg-quickrs-docker
+conf.yml
 
 .idea/

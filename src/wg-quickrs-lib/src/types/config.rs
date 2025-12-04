@@ -60,6 +60,8 @@ pub struct Agent {
     pub web: AgentWeb,
     pub vpn: AgentVpn,
     pub firewall: AgentFirewall,
+    #[serde(default)]
+    pub router: AgentRouter,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -101,5 +103,26 @@ pub struct AgentFirewall {
     pub enabled: bool,
     pub utility: PathBuf,
     pub gateway: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentRouter {
+    #[serde(default = "default_router_mode")]
+    pub mode: String, // "host" or "router"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lan_cidr: Option<String>, // e.g., "192.168.1.0/24"
+}
+
+fn default_router_mode() -> String {
+    "host".to_string()
+}
+
+impl Default for AgentRouter {
+    fn default() -> Self {
+        AgentRouter {
+            mode: "host".to_string(),
+            lan_cidr: None,
+        }
+    }
 }
 

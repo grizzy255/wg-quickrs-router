@@ -1,186 +1,138 @@
 <template>
 
-  <div class="flex flex-col font-mono h-screen">
+  <!-- Init Wizard (shown when config doesn't exist) -->
+  <init-wizard v-if="showInitWizard"
+               :api="api"
+               @complete="handleInitComplete">
+  </init-wizard>
 
+  <div v-else class="flex flex-col font-mono h-screen transition-colors duration-300">
+    <div class="flex-1 flex flex-col bg-page">
+    
     <!-- Header -->
-    <div class="container mx-auto shrink-0 max-w-3xl relative">
-      <!--  Logo + Name  -->
-      <div class="flex mt-5">
-
-        <!-- Middle (grows + truncates) -->
-        <div class="float-left px-3 flex items-center flex-grow min-w-0">
-          <div class="inline-block relative">
-            <!-- Settings Button -->
+    <div class="bg-header border-b border-divider px-6 py-4">
+      <div class="container mx-auto max-w-7xl flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-primary">wg-quickrs</h1>
+          <span class="px-2 py-1 text-xs font-medium text-secondary bg-button rounded-full">Web Console</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Dark Mode Toggle -->
+          <button
+              @click="toggleDarkMode"
+              class="h-8 w-8 rounded-md bg-button text-text-button hover:bg-button-hover flex items-center justify-center transition-colors"
+              :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+            <Sun v-if="isDarkMode" :size="20" />
+            <Moon v-else :size="20" />
+          </button>
+          <!-- Settings Button -->
+          <div class="relative">
             <button
-                :class="[settingsDropdownOpen ? 'bg-gray-300': '']"
-                class="mt-0.5 mr-2 h-8 w-8 rounded-md bg-gray-200 text-gray-600 hover:bg-gray-300 flex items-center justify-center shrink-0"
+                :class="[settingsDropdownOpen ? 'bg-button-hover': '']"
+                class="h-8 w-8 rounded-md bg-button text-text-button hover:bg-button-hover flex items-center justify-center transition-colors"
                 @click="settingsDropdownOpen = !settingsDropdownOpen">
-              <img alt="settings" class="h-6" src="/icons/iconfinder/ionicons-211751_gear_icon.svg">
+              <Settings :size="20" />
             </button>
-
             <!-- Settings Dropdown -->
             <div v-if="settingsDropdownOpen"
-                 class="absolute left-0 top-9 w-24 bg-white border border-gray-200 rounded-md shadow-lg z-20 flex items-center justify-center">
+                 class="absolute right-0 top-10 w-24 bg-dropdown border border-divider rounded-md shadow-lg z-20">
               <button
-                  class="block w-full text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                  class="block w-full text-left px-3 py-2 text-sm text-text-button hover:bg-button rounded-md flex items-center"
                   @click="settingsDropdownOpen = false; logout();">
-                <img alt="logout" class="inline-block float-left h-5 mr-1"
-                     src="/icons/iconfinder/iconoir-9042719_log_out_icon.svg">
+                <LogOut :size="16" class="mr-2" />
                 <span>Logout</span>
               </button>
             </div>
           </div>
-          <!-- Title -->
-          <h1 class="text-4xl truncate font-semibold py-1">
-            <span>wg-quickrs web console</span>
-          </h1>
         </div>
+      </div>
+    </div>
 
-        <!--   Indicators/Buttons   -->
-        <div class="inline-block float-right pr-3 my-auto">
-          <!-- Web Server Status -->
-          <div class="flex items-center pl-1">
-            <div v-if="webServerStatus === 'unknown'"
-                 class="inline-block shadow-md rounded-lg p-1.5 mr-2 bg-yellow-500 hover:bg-yellow-400"
-                 title="Management Web Server Status Unknown"></div>
-            <div v-else-if="webServerStatus === 'down'"
-                 class="inline-block shadow-md rounded-lg p-1.5 mr-2 bg-red-500 hover:bg-red-400"
-                 title="Management Web Server is Down/Not reachable"></div>
-            <div v-else-if="webServerStatus === 'up'"
-                 class="inline-block shadow-md rounded-lg p-1.5 mr-2 bg-green-500 hover:bg-green-400"
-                 title="Management Web Server is Up"></div>
-            <span class="text-sm text-gray-500 text-right">Web Server Status</span>
+    <!-- Main Content -->
+    <div class="flex-1 overflow-y-auto">
+      <div class="container mx-auto max-w-7xl px-6 py-6 text-primary">
+        
+        <!-- Top Row: Three Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          
+          <!-- System Health & Information Card -->
+          <system-health-card
+              :web-server-status="webServerStatus"
+              :wireguard-status="wireguardStatus"
+              :network="network"
+              :stringify-endpoint="stringify_endpoint"
+              :router-mode="routerMode"
+              :lan-cidr="routerModeLanCidr"
+              @update-lan-cidr="handleUpdateLanCidr">
+          </system-health-card>
+
+          <!-- Control Center Card -->
+          <control-center-card
+              :wireguard-status="wireguardStatus"
+              :router-mode="routerMode"
+              :connected-peers="connectedPeers"
+              :get-peer-name="getPeerName"
+              :get-peer-last-handshake="getPeerLastHandshake"
+              :format-last-handshake="formatLastHandshake"
+              :has-lan-access="hasLanAccess"
+              :lan-access-loading="lanAccessLoading"
+              :peer-control-loading="peerControlLoading"
+              @toggle-wireguard="dialogId = 'network-toggle'"
+              @toggle-router-mode="handleRouterModeToggle"
+              @toggle-lan-access="toggleLanAccess"
+              @peer-control="handlePeerControl">
+          </control-center-card>
+
+          <!-- Gateway Status Card -->
+          <div class="bg-card rounded-lg shadow-sm border border-divider p-5 hover:shadow-md transition-shadow duration-200">
+            <h2 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <Router :size="20" class="text-icon" />
+              Gateway Status
+            </h2>
+            <router-mode
+                :mode="routerMode"
+                :lan-cidr="routerModeLanCidr"
+                :api="api"
+                :network="network"
+                @toggle="handleRouterModeToggle"
+                @update:lan-cidr="handleRouterModeLanCidrUpdate">
+            </router-mode>
           </div>
+        </div>
 
-          <!-- WireGuard Status -->
-          <div class="flex items-center pl-1">
-            <div v-if="wireguardStatus === 'unknown'"
-                 class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 mr-1 bg-yellow-500 hover:bg-yellow-400"
-                 title="WireGuard Networking Status Unknown">
-              <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[7px] my-[2px] bg-white"></div>
-            </div>
-            <div v-else-if="wireguardStatus === 'down'"
-                 class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 mr-1 bg-red-500 cursor-pointer hover:bg-red-400"
-                 title="Enable WireGuard Networking"
-                 @click="dialogId = 'network-toggle'">
-              <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[2px] my-[2px] bg-white"></div>
-            </div>
-            <div v-else-if="wireguardStatus === 'up'"
-                 class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 mr-1 bg-green-500 cursor-pointer hover:bg-green-400"
-                 title="Disable WireGuard Networking"
-                 @click="dialogId = 'network-toggle'">
-              <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[12px] my-[2px] bg-white"></div>
-            </div>
-            <span class="text-sm text-gray-500 text-right" style="margin-left: 3px">WireGuard Status</span>
+        <!-- Traffic Analysis Card (Full Width) -->
+        <traffic-analysis-card
+            :network="network"
+            :telemetry="telemetry">
+        </traffic-analysis-card>
+
+        <!-- Network Topology Card -->
+        <div class="bg-card rounded-lg shadow-sm border border-divider p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-primary flex items-center gap-2">
+              <Network :size="20" class="text-secondary" />
+              Network Topology
+            </h2>
+            <button :disabled="webServerStatus !== 'up'"
+                    class="px-4 py-2 bg-green-500 text-white text-sm font-medium rounded-md hover:bg-green-600 disabled:bg-gray-400 disabled:text-gray-600 disabled:cursor-not-allowed transition flex items-center gap-2"
+                    @click="dialogId = 'create-peer'">
+              <Plus :size="16" />
+              Add Peer
+            </button>
+          </div>
+          <div id="graph-app" class="h-[500px] overflow-hidden">
+            <map-visual :network="network"
+                        :telemetry="telemetry"
+                        @peer-selected="onPeerSelected"></map-visual>
           </div>
         </div>
-      </div>
 
-      <!--  Network name and host info line(s)  -->
-      <div class="flex items-center opacity-50">
-
-        <!-- Network Name -->
-        <div v-if="network.this_peer"
-             class="inline-block text-gray-800 text-xs ml-3 text-left">
-          <span>Network Name: <strong class="inline-block">{{ network.name }}</strong></span>
-        </div>
-
-        <div v-if="network.this_peer"
-             class="inline-block text-gray-800 text-xs mr-3 text-right">
-          <span>
-            Host: <strong class="inline-block whitespace-pre-wrap">{{
-              network.peers[network.this_peer].name
-            }}</strong>
-          </span>
-          <span class="inline-block whitespace-pre-wrap">({{ network.this_peer }})</span>
-          <span class="inline-block whitespace-pre-wrap">
-            @
-            {{ network.peers[network.this_peer].address }} /
-            {{ stringify_endpoint(network.peers[network.this_peer].endpoint) }}
-          </span>
-        </div>
       </div>
     </div>
 
-    <!-- Traffic Graph -->
-    <div class="container mx-auto shrink-0 max-w-6xl px-3">
-      <traffic-graph :network="network"
-                     :telemetry="telemetry"></traffic-graph>
-    </div>
+    </div><!-- End of dark mode wrapper -->
 
-    <!-- Map -->
-    <div id="graph-app" class="container mx-auto flex-1 max-w-6xl mt-1 px-3 overflow-hidden">
-      <map-visual :network="network"
-                  :telemetry="telemetry"
-                  @peer-selected="onPeerSelected"></map-visual>
-    </div>
-
-    <!-- Add a Peer Buttons -->
-    <div class="container mx-auto shrink-0 max-w-6xl">
-      <!-- Add a Peer -->
-      <div class="items-center justify-center p-3 px-5 border-gray-100">
-        <button :disabled="webServerStatus !== 'up'"
-                class="bg-green-100 text-gray-700 border-2 border-gray-500 py-2 px-4 rounded items-center transition w-full enabled:hover:bg-green-700 enabled:hover:border-green-700 disabled:bg-gray-400 disabled:border-gray-400 enabled:hover:text-gray-100"
-                @click="dialogId = 'create-peer'">
-          <span class="text-sm">+ Add a Peer</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="text-center text-gray-500 mb-5 mx-2 shrink-0">
-      <small v-if="version_build_info" :title="version_build_readable_ts" class="inline-block whitespace-pre-wrap">
-        version:
-        <strong>
-          <a :href="`https://github.com/GodOfKebab/wg-quickrs/releases/tag/v${version_build_info.version}`"
-             class="hover:underline"
-             target="_blank">
-            {{ version_build_info.version }}
-          </a>
-        </strong>
-      </small>
-      <small v-if="version_build_info" :title="version_build_readable_ts" class="inline-block whitespace-pre-wrap">
-        build:
-        <strong>
-          <a :href="`https://github.com/GodOfKebab/wg-quickrs/commits/${version_build_info.build.commit}`"
-             class="hover:underline"
-             target="_blank">
-            {{ version_build_info.build.branch }}#{{ version_build_info.build.commit.slice(0, 7) }}
-          </a>
-        </strong>
-        <strong>@{{ version_build_info.build.timestamp }}</strong>
-      </small>
-      <small :title="last_fetch.readable" class="inline-block whitespace-pre-wrap">
-        last fetched:
-        <strong v-if="last_fetch.since < 0" class="text-red-700">Never</strong>
-        <strong v-else-if="last_fetch.since > refreshRate * 5"
-                class="text-yellow-700">{{ last_fetch.rfc3339 }}</strong>
-        <strong v-else class="text-green-700">{{ last_fetch.rfc3339 }}</strong>
-      </small>
-      <br/>
-      <br/>
-      <small>
-        <a class="hover:underline" href="https://www.wireguard.com/" target="_blank">
-          "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
-        </a>
-      </small>
-      <br/>
-      <small>
-        <span>
-          © 2025
-        </span>
-        <strong>
-          <a class="hover:underline" href="https://github.com/GodOfKebab/wg-quickrs" target="_blank">wg-quickrs</a>
-        </strong>
-        <span>
-          -
-        </span>
-        <a class="hover:underline" href="https://yasar.idikut.cc/" target="_blank">
-          Yaşar İdikut
-        </a>
-      </small>
-
-    </footer>
+    <!-- Footer (removed version/build/copyright info) -->
 
     <!-- Dialog: Ask Password -->
     <password-dialog v-if="api.does_need_auth"
@@ -195,10 +147,10 @@
                    :right-button-text="wireguardStatus === 'up' ? 'Disable' : 'Enable'"
                    class="z-10"
                    icon="danger">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">
+      <h3 class="text-lg leading-6 font-medium text-primary">
         {{ wireguardStatus === 'up' ? 'Disable' : 'Enable' }} the WireGuard Network
       </h3>
-      <div class="mt-2 text-sm text-gray-500">
+      <div class="mt-2 text-sm text-secondary">
         Are you sure you want to {{ wireguardStatus === 'up' ? 'disable' : 'enable' }} the WireGuard
         network?
       </div>
@@ -217,25 +169,54 @@
                         :api="api"
                         :network="network"></peer-create-dialog>
 
+    <!-- Dialog: Router Mode -->
+    <router-mode-dialog
+        v-if="dialogId === 'router-mode'"
+        :router-mode-lan-cidr="routerModeLanCidr"
+        @confirm="handleRouterModeConfirm"
+        @cancel="dialogId = ''">
+    </router-mode-dialog>
+
+    <!-- Dialog: Router Mode Error -->
+    <custom-dialog v-if="dialogId === 'router-mode-error'"
+                   :left-button-click="() => { dialogId = ''; routerModeError = '' }"
+                   modal-classes="max-w-xl"
+                   :left-button-text="'OK'"
+                   :right-button-click="() => { dialogId = ''; routerModeError = '' }"
+                   :right-button-text="''"
+                   class="z-10"
+                   icon="danger">
+      <h3 class="text-lg leading-6 font-medium text-primary">
+        Cannot Change Mode
+      </h3>
+      <div class="mt-2 text-sm text-secondary">
+        <div v-if="routerModeError">{{ routerModeError }}</div>
+        <div v-else>Mode cannot be changed while peers are configured. To change the mode, you must first delete all peers from the network. After deleting all peers, you can switch between Host and Router modes.</div>
+      </div>
+    </custom-dialog>
+
   </div>
 </template>
 
 <script>
 import API from "@/src/js/api.js";
-import TrafficGraph from "@/src/components/traffic-graph.vue";
 import MapVisual from "@/src/components/map-visual.vue";
 import CustomDialog from "@/src/components/dialogs/custom-dialog.vue";
 import PasswordDialog from "@/src/components/dialogs/password-dialog.vue";
 import PeerConfigDialog from "@/src/components/dialogs/peer-config-dialog.vue";
 import PeerCreateDialog from "@/src/components/dialogs/peer-create-dialog.vue";
+import RouterMode from "@/src/components/router-mode.vue";
+import RouterModeDialog from "@/src/components/dialogs/router-mode-dialog.vue";
+import InitWizard from "@/src/components/init-wizard.vue";
+import SystemHealthCard from "@/src/components/cards/SystemHealthCard.vue";
+import ControlCenterCard from "@/src/components/cards/ControlCenterCard.vue";
+import TrafficAnalysisCard from "@/src/components/cards/TrafficAnalysisCard.vue";
+import { Settings, LogOut, Router, Network, Plus, Sun, Moon } from 'lucide-vue-next';
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import init from '@/pkg/wg_quickrs_lib.js';
 import WireGuardHelper from "@/src/js/wg-helper.js";
-import {
-  get_version_build_info_wasm,
-} from '@/pkg/wg_quickrs_lib.js';
 
 
 dayjs.extend(relativeTime);
@@ -244,11 +225,23 @@ export default {
   name: "app",
   components: {
     PasswordDialog,
-    TrafficGraph,
     MapVisual,
     CustomDialog,
     PeerConfigDialog,
-    PeerCreateDialog
+    PeerCreateDialog,
+    RouterMode,
+    RouterModeDialog,
+    InitWizard,
+    SystemHealthCard,
+    ControlCenterCard,
+    TrafficAnalysisCard,
+    Settings,
+    LogOut,
+    Router,
+    Network,
+    Plus,
+    Sun,
+    Moon
   },
   data() {
     return {
@@ -269,14 +262,36 @@ export default {
         readable: "",
         since: -1,
       },
-      version_build_info: null,
-      version_build_readable_ts: '',
       wasmInitialized: false,
       api: {does_need_auth: false},
-      settingsDropdownOpen: false
+      settingsDropdownOpen: false,
+      routerMode: 'unknown', // 'unknown', 'host', 'router'
+      routerModeLanCidr: null,
+      routerModeError: '',
+      showInitWizard: false,
+      isInitialized: false,  // Default to false - will be set by checkInitStatus()
+      isDarkMode: false,     // Dark mode state
+      peerLanAccess: {},     // Track LAN access per peer: { peerId: boolean }
+      lanAccessLoading: {},  // Track LAN access toggle loading: { peerId: boolean }
+      peerControlLoading: {} // Track peer control loading: { peerId: 'reconnect'|'stop'|'start' }
     }
   },
   async mounted() {
+    // Load dark mode preference from localStorage
+    const savedDarkMode = localStorage.getItem('darkMode');
+    if (savedDarkMode !== null) {
+      this.isDarkMode = savedDarkMode === 'true';
+    } else {
+      // Check system preference
+      this.isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    // Apply dark class to <html> element for Tailwind
+    if (this.isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
     if (!this.wasmInitialized) {
       try {
         await init();
@@ -285,25 +300,109 @@ export default {
         console.error('WASM failed to load:', err);
       }
     }
-    this.version_build_info = get_version_build_info_wasm();
 
     this.api = new API();
     if (localStorage.getItem('remember') === 'true') {
       this.api.token = localStorage.getItem('token') || '';
     }
 
-    setInterval(() => {
-      this.refresh()
-    }, this.refreshRate)
+    // Check if initialization is needed
+    await this.checkInitStatus();
+
+    // Only set up refresh interval if initialized
+    if (this.isInitialized && !this.showInitWizard) {
+      setInterval(() => {
+        this.refresh()
+      }, this.refreshRate)
+    }
   },
-  computed: {},
+  computed: {
+    connectedPeers() {
+      if (!this.telemetry || !this.telemetry.data || this.telemetry.data.length === 0 || !this.network || !this.network.peers) {
+        return [];
+      }
+      
+      const now = Math.floor(Date.now() / 1000);
+      const HANDSHAKE_TIMEOUT = 180; // 3 minutes - consider peer connected if handshake within last 3 minutes
+      const connectedPeerIds = new Set();
+      
+      // Get the latest telemetry data
+      const latestData = this.telemetry.data[this.telemetry.data.length - 1];
+      if (!latestData || !latestData.datum) {
+        return [];
+      }
+      
+      // Extract peer IDs from connection IDs and check handshake times
+      for (const [connectionId, telemetryDatum] of Object.entries(latestData.datum)) {
+        if (telemetryDatum.latest_handshake_at && (now - telemetryDatum.latest_handshake_at) < HANDSHAKE_TIMEOUT) {
+          // Connection ID format: "uuid1*uuid2" - extract both peer IDs
+          const parts = connectionId.split('*');
+          if (parts.length === 2) {
+            const peer1 = parts[0];
+            const peer2 = parts[1];
+            // Only include peers that exist in network and are not this peer
+            if (this.network.peers[peer1] && peer1 !== this.network.this_peer) {
+              connectedPeerIds.add(peer1);
+            }
+            if (this.network.peers[peer2] && peer2 !== this.network.this_peer) {
+              connectedPeerIds.add(peer2);
+            }
+          }
+        }
+      }
+      
+      return Array.from(connectedPeerIds);
+    }
+  },
   methods: {
     stringify_endpoint(endpoint) {
       return WireGuardHelper.stringify_endpoint(endpoint);
     },
+    getPeerName(peerId) {
+      if (!this.network || !this.network.peers || !this.network.peers[peerId]) {
+        return peerId.substring(0, 8) + '...';
+      }
+      return this.network.peers[peerId].name || peerId.substring(0, 8) + '...';
+    },
+    getPeerLastHandshake(peerId) {
+      if (!this.telemetry || !this.telemetry.data || this.telemetry.data.length === 0) {
+        return null;
+      }
+      
+      const latestData = this.telemetry.data[this.telemetry.data.length - 1];
+      if (!latestData || !latestData.datum) {
+        return null;
+      }
+      
+      // Find the connection that includes this peer
+      for (const [connectionId, telemetryDatum] of Object.entries(latestData.datum)) {
+        const parts = connectionId.split('*');
+        if (parts.length === 2 && (parts[0] === peerId || parts[1] === peerId)) {
+          return telemetryDatum.latest_handshake_at || null;
+        }
+      }
+      
+      return null;
+    },
+    formatLastHandshake(timestamp) {
+      if (!timestamp) return 'Never';
+      const now = Math.floor(Date.now() / 1000);
+      const diff = now - timestamp;
+      if (diff < 60) return `${diff}s ago`;
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+      return `${Math.floor(diff / 86400)}d ago`;
+    },
     async refresh() {
+      // Don't refresh if not initialized - double check to prevent API calls
+      if (!this.isInitialized || this.showInitWizard) {
+        return;
+      }
+
       this.last_fetch.since = this.last_fetch.rfc3339 ? new Date() - new Date(this.last_fetch.rfc3339) : -1;
-      this.version_build_readable_ts = `${this.version_build_info.build.timestamp} [${dayjs(this.version_build_info.build.timestamp).fromNow()}]`;
+
+      // Fetch router mode status (this method also checks isInitialized)
+      this.fetchRouterMode();
 
       let need_to_update_network = true;
       if (this.digest.length === 64) {
@@ -324,7 +423,6 @@ export default {
             this.webServerStatus = 'down';
           } else {
             this.webServerStatus = 'unknown';
-            console.log(err);
           }
         });
       }
@@ -357,19 +455,20 @@ export default {
             this.webServerStatus = 'down';
           } else {
             this.webServerStatus = 'unknown';
-            console.log(err);
           }
         });
       }
     },
     toggleWireGuardNetworking() {
+      // Don't toggle if not initialized
+      if (!this.isInitialized) {
+        return;
+      }
       const curr = this.wireguardStatus === 'up';
       this.api.post_wireguard_status({status: curr ? 'down' : 'up'})
           .then(() => {
             this.refresh();
-          }).catch(err => {
-        console.log(err);
-      });
+          }).catch(() => {});
       this.wireguardStatus = 'unknown';
     },
     onPeerSelected(peer_id) {
@@ -379,7 +478,216 @@ export default {
       this.api.token = '';
       localStorage.removeItem('token');
       localStorage.removeItem('remember');
-      this.refresh();
+      // Don't refresh if not initialized
+      if (this.isInitialized) {
+        this.refresh();
+      }
+    },
+    async checkInitStatus() {
+      try {
+        const status = await this.api.get_init_status();
+        this.isInitialized = status.initialized;
+        this.showInitWizard = !status.initialized;
+      } catch (err) {
+        // If API call fails, assume not initialized
+        console.error('Failed to check init status:', err);
+        this.isInitialized = false;
+        this.showInitWizard = true;
+      }
+    },
+    async fetchRouterMode() {
+      // Don't fetch router mode if not initialized (endpoint doesn't exist in init mode)
+      if (!this.isInitialized) {
+        this.routerMode = 'unknown';
+        return;
+      }
+      try {
+        const modeData = await this.api.get_mode();
+        this.routerMode = modeData.mode || 'host';
+        this.routerModeLanCidr = modeData.lan_cidr || null;
+        
+        // Fetch LAN access status when in router mode
+        if (this.routerMode === 'router') {
+          this.fetchLanAccessStatus();
+        }
+      } catch {
+        this.routerMode = 'unknown';
+      }
+    },
+    async fetchLanAccessStatus() {
+      try {
+        const result = await this.api.get_peer_lan_access();
+        if (result && result.peer_lan_access) {
+          const lanAccess = {};
+          for (const [peerId, info] of Object.entries(result.peer_lan_access)) {
+            lanAccess[peerId] = info.has_lan_access;
+          }
+          this.peerLanAccess = lanAccess;
+        }
+      } catch (error) {
+        console.error('Failed to load LAN access status:', error);
+      }
+    },
+    hasLanAccess(peerId) {
+      // Default to true if not specified
+      return this.peerLanAccess[peerId] !== false;
+    },
+    async toggleLanAccess(peerId) {
+      if (this.lanAccessLoading[peerId]) return;
+      
+      const currentAccess = this.hasLanAccess(peerId);
+      const newAccess = !currentAccess;
+      
+      this.lanAccessLoading = { ...this.lanAccessLoading, [peerId]: true };
+      
+      try {
+        await this.api.set_peer_lan_access(peerId, newAccess);
+        this.peerLanAccess = { ...this.peerLanAccess, [peerId]: newAccess };
+      } catch (error) {
+        console.error('Failed to toggle LAN access:', error);
+        alert(`Failed to toggle LAN access: ${error.message}`);
+      } finally {
+        this.lanAccessLoading = { ...this.lanAccessLoading, [peerId]: false };
+      }
+    },
+    async handlePeerControl(peerId, action) {
+      if (this.peerControlLoading[peerId]) return;
+      
+      this.peerControlLoading = { ...this.peerControlLoading, [peerId]: action };
+      
+      try {
+        await this.api.peer_control(peerId, action);
+      } catch (error) {
+        console.error(`Failed to ${action} peer:`, error);
+        alert(`Failed to ${action} peer: ${error.message}`);
+      } finally {
+        this.peerControlLoading = { ...this.peerControlLoading, [peerId]: null };
+      }
+    },
+    handleInitComplete() {
+      this.showInitWizard = false;
+      // Don't set isInitialized to true yet - wait for service to restart
+      // Poll for init status until service restarts and detects the config
+      this.pollUntilInitialized();
+    },
+    async pollUntilInitialized() {
+      const maxAttempts = 30; // 30 attempts = 30 seconds
+      let attempts = 0;
+      
+      const poll = async () => {
+        try {
+          const status = await this.api.get_init_status();
+          if (status.initialized) {
+            // Try to call a config-dependent endpoint to verify service is out of init mode
+            try {
+              await this.api.get_network_summary('?only_digest=true');
+              // If we get here, service is out of init mode
+              this.isInitialized = true;
+              // Set up refresh interval
+              setInterval(() => {
+                this.refresh()
+              }, this.refreshRate);
+              // Reload the page to start fresh with the new config
+              window.location.reload();
+              return;
+            } catch (err) {
+              // Endpoint not available yet - service still in init mode
+              // Continue polling
+            }
+          }
+          
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 1000); // Poll every second
+          } else {
+            // Timeout - show message that service needs restart
+            alert('Initialization complete! Please restart the wg-quickrs service for changes to take effect.\n\nRun: systemctl restart wg-quickrs.service');
+            this.showInitWizard = false;
+            this.isInitialized = false;
+          }
+        } catch (err) {
+          attempts++;
+          if (attempts < maxAttempts) {
+            setTimeout(poll, 1000);
+          } else {
+            alert('Initialization complete! Please restart the wg-quickrs service for changes to take effect.\n\nRun: systemctl restart wg-quickrs.service');
+            this.showInitWizard = false;
+            this.isInitialized = false;
+          }
+        }
+      };
+      
+      // Start polling after a short delay
+      setTimeout(poll, 1000);
+    },
+    async handleRouterModeToggle() {
+      // First check if mode can be switched (applies to both Host and Router Mode)
+      try {
+        const canSwitch = await this.api.can_switch_mode();
+        if (!canSwitch.can_switch) {
+          // Show modal with error message
+          this.dialogId = 'router-mode-error';
+          return;
+        }
+      } catch {
+        this.dialogId = 'router-mode-error';
+        return;
+      }
+
+      // If switching to Host Mode, do it directly
+      if (this.routerMode === 'router') {
+        // Switch to Host Mode directly
+        try {
+          const result = await this.api.toggle_mode('host', null);
+          this.routerMode = result.mode || 'host';
+          this.routerModeLanCidr = null;
+        } catch (err) {
+          this.routerModeError = err.message || 'Failed to switch to Host Mode.';
+          this.dialogId = 'router-mode-error';
+        }
+        return;
+      }
+
+      // If switching to Router Mode, show the popup dialog
+      // Show Router Mode dialog
+      this.dialogId = 'router-mode';
+    },
+    async handleRouterModeConfirm(cidr) {
+      // Switch to Router Mode with the provided CIDR
+      try {
+        const result = await this.api.toggle_mode('router', cidr);
+        this.routerMode = result.mode || 'router';
+        this.routerModeLanCidr = result.lan_cidr || cidr;
+        this.routerModeError = '';
+        this.dialogId = '';
+      } catch (err) {
+        this.routerModeError = err.message || 'Failed to switch to Router Mode.';
+        // Show error modal
+        this.dialogId = 'router-mode-error';
+      }
+    },
+    toggleDarkMode() {
+      this.isDarkMode = !this.isDarkMode;
+      localStorage.setItem('darkMode', this.isDarkMode.toString());
+      // Apply dark class to <html> element for Tailwind
+      if (this.isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    },
+    async handleUpdateLanCidr(cidr) {
+      // Update LAN CIDR while staying in router mode
+      try {
+        const result = await this.api.toggle_mode('router', cidr);
+        this.routerModeLanCidr = result.lan_cidr || cidr;
+      } catch (err) {
+        console.error('Failed to update LAN CIDR:', err);
+        alert(`Failed to update LAN CIDR: ${err.message}`);
+      }
+    },
+    handleRouterModeLanCidrUpdate(cidr) {
+      this.routerModeLanCidr = cidr;
     }
   }
 }

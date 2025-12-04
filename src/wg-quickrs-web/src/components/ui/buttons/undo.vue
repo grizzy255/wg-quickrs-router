@@ -2,7 +2,7 @@
   <div :class="alignmentClasses" class="inline-block float-right absolute z-20">
     <button
         :disabled="disabled"
-        class="align-middle p-0.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-600 hover:text-gray-100 transition"
+        class="align-middle p-0.5 rounded bg-button text-secondary hover:bg-button-hover hover:text-primary transition"
         title="Undo Changes"
         @click="$emit('click');">
       <!-- "undo" @ https://flowbite.com/icons/ -->

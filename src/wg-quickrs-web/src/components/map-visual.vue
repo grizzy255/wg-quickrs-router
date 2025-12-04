@@ -1,37 +1,101 @@
 <template>
 
-  <div id="graph" class="shadow-md rounded-lg bg-white justify-center"></div>
+  <div id="graph" class="shadow-md rounded-lg bg-card justify-center"></div>
 
 </template>
 
 <script>
 import ForceGraph from "force-graph";
 import FastEqual from "fast-deep-equal";
-import ServerSVG from "@/src/assets/icons/flowbite/server.svg";         // "server" @ https://flowbite.com/icons/
-import DesktopSVG from "@/src/assets/icons/flowbite/desktop-pc.svg";    // "desktop-pc" @ https://flowbite.com/icons/
-import LaptopSVG from "@/src/assets/icons/flowbite/laptop-code.svg";    // "laptop-code" @ https://flowbite.com/icons/
-import TabletSVG from "@/src/assets/icons/flowbite/tablet.svg";         // "tablet" @ https://flowbite.com/icons/
-import PhoneSVG from "@/src/assets/icons/flowbite/mobile-phone.svg";    // "mobile-phone" @ https://flowbite.com/icons/
-import IoTSVG from "@/src/assets/icons/flowbite/cloud-arrow-up.svg";    // "cloud-arrow-up" @ https://flowbite.com/icons/
-import OtherSVG from "@/src/assets/icons/flowbite/question-circle.svg"; // "question-circle" @ https://flowbite.com/icons/
-import LandmarkSVG from "@/src/assets/icons/flowbite/landmark.svg";
-import {get_connection_id_wasm} from "@/pkg/wg_quickrs_lib.js";     // "landmark" @ https://flowbite.com/icons/
+import {get_connection_id_wasm} from "@/pkg/wg_quickrs_lib.js";
 
-const nodeKindIconMap = {
-  "server": ServerSVG,
-  "desktop": DesktopSVG,
-  "laptop": LaptopSVG,
-  "tablet": TabletSVG,
-  "phone": PhoneSVG,
-  "IoT": IoTSVG,
-  "other": OtherSVG,
+// SVG path data for icons (from Lucide icons)
+const iconPaths = {
+  server: 'M2 9h20M2 15h20M6 9v6M10 9v6M14 9v6M18 9v6M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z',
+  desktop: 'M20 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 21h8M12 17v4',
+  laptop: 'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',
+  tablet: 'M12 18h.01M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z',
+  phone: 'M12 18h.01M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z',
+  IoT: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 3v1M12 20v1M3 12h1M20 12h1M5.64 5.64l.7.7M17.66 17.66l.7.7M5.64 18.36l.7-.7M17.66 6.34l.7-.7',
+  other: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 16v.01M12 8v4',
+  landmark: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+};
+
+// Generate SVG data URL with dynamic color
+function getIconDataUrl(iconType, color) {
+  const path = iconPaths[iconType] || iconPaths.other;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path.split('M').map((p, i) => i === 0 ? '' : `<path d="M${p}"/>`).join('')}</svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
 }
 
+// Get icon color based on dark mode - uses CSS variable for consistency
+function getIconColor() {
+  const root = document.documentElement;
+  return getComputedStyle(root).getPropertyValue('--text-icon').trim() || (isDarkMode() ? '#6b7280' : '#6b7280');
+}
+
+// Light mode colors
 const tw_gray_50 = 'oklch(98.5% 0.002 247.839)';
 const tw_gray_200 = 'oklch(92.8% 0.006 264.531)';
 const tw_gray_300 = 'oklch(87.2% 0.01 258.338)';
 const tw_gray_500 = 'oklch(55.1% 0.027 264.364)';
 const tw_gray_700 = 'oklch(37.3% 0.034 259.733)';
+
+// Dark mode colors
+const tw_gray_800 = 'oklch(27.4% 0.024 264.531)';
+const tw_gray_900 = 'oklch(21% 0.024 264.531)';
+const tw_gray_100 = 'oklch(96.7% 0.003 264.531)';
+
+// Helper to check dark mode
+function isDarkMode() {
+  return document.documentElement.classList.contains('dark');
+}
+
+// Dynamic color getters - use CSS variables for consistency
+function getLabelBgColor() {
+  const root = document.documentElement;
+  return getComputedStyle(root).getPropertyValue('--bg-card').trim() || (isDarkMode() ? tw_gray_800 : tw_gray_50);
+}
+
+function getLabelTextColor() {
+  const root = document.documentElement;
+  return getComputedStyle(root).getPropertyValue('--text-primary').trim() || (isDarkMode() ? tw_gray_100 : tw_gray_700);
+}
+
+function getNodeIconBgColor() {
+  const root = document.documentElement;
+  return getComputedStyle(root).getPropertyValue('--bg-card').trim() || (isDarkMode() ? tw_gray_800 : tw_gray_50);
+}
+
+// Get link colors based on dark mode
+function getLinkColor(strength) {
+  const root = document.documentElement;
+  if (isDarkMode()) {
+    // Dark mode: use lighter grays for visibility
+    switch (strength) {
+      case 1:
+        return getComputedStyle(root).getPropertyValue('--border-divider').trim() || tw_gray_700;
+      case 2:
+        return getComputedStyle(root).getPropertyValue('--border-input').trim() || tw_gray_600;
+      case 3:
+        return getComputedStyle(root).getPropertyValue('--text-icon').trim() || tw_gray_500;
+      default:
+        return tw_gray_700;
+    }
+  } else {
+    // Light mode: use existing grays
+    switch (strength) {
+      case 1:
+        return tw_gray_200;
+      case 2:
+        return tw_gray_300;
+      case 3:
+        return tw_gray_500;
+      default:
+        return tw_gray_200;
+    }
+  }
+}
 const tw_orange_600 = 'oklch(70.5% 0.213 47.604)';
 const tw_emerald_600 = 'oklch(59.6% 0.145 163.225)';
 const tw_red_600 = 'oklch(57.7% 0.245 27.325)';
@@ -114,13 +178,16 @@ export default {
       if (this.initializedGraph) {
         try {
           this.graph.graphData(this.calculateForceGraphData(newVal));
-        } catch (e) {
-          console.log(e);
+        } catch {
+          // Ignore graph update errors
         }
       }
 
       if (!this.initializedGraph) {
         try {
+          // Enhanced orbital layout: center node in middle, peers in orbit
+          const centerNode = this.network?.this_peer;
+          
           this.graph = ForceGraph()(document.getElementById('graph'))
               .autoPauseRedraw(false)
               .width(this.container.offsetWidth - 24)
@@ -147,14 +214,19 @@ export default {
                 ctx.fillStyle = nodeKindHighlightColorMap[node.kind] || nodeKindHighlightColorMap['other'];
                 ctx.fill();
 
+                const iconColor = getIconColor();
                 const img = new Image();
-                if (node.icon.enabled) img.src = node.icon.src;
-                img.src = img.src || nodeKindIconMap[node.kind] || nodeKindIconMap['other'];
+                if (node.icon.enabled) {
+                  img.src = node.icon.src;
+                } else {
+                  img.src = getIconDataUrl(node.kind, iconColor);
+                }
                 const cis = this.getGraphNodeIcon(img, 500);
                 ctx.drawImage(cis, node.x - node.size / 2, node.y - node.size / 2, node.size, node.size);
+                
                 if (node.id === this.network.this_peer) {
                   const marker_img = new Image();
-                  marker_img.src = LandmarkSVG;
+                  marker_img.src = getIconDataUrl('landmark', iconColor);
                   const marker = this.getGraphNodeIcon(marker_img, 500);
                   ctx.drawImage(marker, node.x - node.size / 4, node.y - 3 * node.size / 4, node.size / 2, node.size / 2);
                 }
@@ -166,7 +238,7 @@ export default {
                 // node label "div"
                 const textWidth = ctx.measureText(node.name).width;
                 const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.3); // some padding
-                ctx.fillStyle = tw_gray_50;
+                ctx.fillStyle = getLabelBgColor();
                 roundRect(ctx,
                     node.x - bckgDimensions[0] / 2.,
                     node.y + node.size / 2. - bckgDimensions[1] / 2.,
@@ -176,7 +248,7 @@ export default {
                 );
 
                 // node label "text" 2/2
-                ctx.fillStyle = tw_gray_700;
+                ctx.fillStyle = getLabelTextColor();
                 ctx.textAlign = 'center';
                 ctx.textBaseline = "alphabetic";
                 ctx.fillText(node.name, node.x, node.y + node.size / 2. + fontSize * 0.3);
@@ -265,10 +337,11 @@ export default {
               })
               .linkDirectionalParticleSpeed(0.025)
               .linkDirectionalParticleColor((particle_info) => {
+                // Use consistent colors that work in both light and dark mode
                 if (particle_info.source.id === this.network.this_peer) {
-                  return 'rgba(59,130,246,0.5)';  // RX
+                  return 'rgba(59,130,246,0.6)';  // RX - blue, slightly more opaque for dark mode visibility
                 } else if (particle_info.target.id === this.network.this_peer) {
-                  return 'rgba(34,197,94,0.5)';  // TX
+                  return 'rgba(34,197,94,0.6)';  // TX - green, slightly more opaque for dark mode visibility
                 }
                 return particle_info.color;
               })
@@ -284,10 +357,36 @@ export default {
             this.$emit('peer-selected', node.id);
           });
 
-          this.graph.graphData(this.calculateForceGraphData(newVal));
+          // Add orbital positioning after graph is created
+          let graphData = this.calculateForceGraphData(newVal);
+          if (centerNode) {
+            // Initialize node positions for orbital layout
+            const centerX = this.container.offsetWidth / 2;
+            const centerY = this.container.offsetHeight / 2;
+            const peerCount = Object.keys(this.network?.peers || {}).length;
+            const baseRadius = Math.min(250, Math.max(120, peerCount * 35));
+            
+            let peerIndex = 0;
+            graphData.nodes.forEach((node) => {
+              if (node.id === centerNode) {
+                node.x = centerX;
+                node.y = centerY;
+                node.fx = centerX; // Fix center node position
+                node.fy = centerY;
+              } else {
+                // Position peers in orbit
+                const angle = peerIndex * (2 * Math.PI / Math.max(1, peerCount - 1));
+                node.x = centerX + baseRadius * Math.cos(angle);
+                node.y = centerY + baseRadius * Math.sin(angle);
+                peerIndex++;
+              }
+            });
+          }
+          
+          this.graph.graphData(graphData);
           this.initializedGraph = true;
-        } catch (e) {
-          console.log(e);
+        } catch {
+          // Ignore graph initialization errors
         }
       }
     },
@@ -353,19 +452,7 @@ export default {
           const linkColorStrength = 1
               + network.static_peer_ids.includes(a)
               + network.static_peer_ids.includes(b);
-          let color = '';
-          // eslint-disable-next-line default-case
-          switch (linkColorStrength) {
-            case 1:
-              color = tw_gray_200;
-              break;
-            case 2:
-              color = tw_gray_300;
-              break;
-            case 3:
-              color = tw_gray_500;
-              break;
-          }
+          const color = getLinkColor(linkColorStrength);
           forceG.links.push({
             source: a, target: b, particleCount: 0, color, strength: linkColorStrength,
           });
@@ -399,9 +486,10 @@ export default {
       tmpCtx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2, true);
       tmpCtx.closePath();
       tmpCtx.clip();
-      tmpCtx.fillStyle = tw_gray_50;
+      tmpCtx.fillStyle = getNodeIconBgColor();
       tmpCtx.fillRect(0, 0, size, size);
       tmpCtx.drawImage(image, size / 4, size / 4, size / 2, size / 2);
+      
       return tmpCanvas;
     },
     async graphEmitParticles(link, particleCount) {

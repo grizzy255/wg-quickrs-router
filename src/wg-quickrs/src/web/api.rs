@@ -1,5 +1,7 @@
 use crate::conf;
 use crate::wireguard;
+use crate::mode::ui_mode;
+use crate::web::init;
 use actix_web::{HttpRequest, HttpResponse, Responder, get, patch, post, web};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
@@ -69,6 +71,87 @@ async fn post_wireguard_status(req: HttpRequest, body: web::Bytes) -> impl Respo
         return e;
     }
     wireguard::respond::post_wireguard_server_status(body).unwrap_or_else(|e| e)
+}
+
+// Mode endpoints
+#[get("/api/mode")]
+async fn get_mode(req: HttpRequest) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::get_mode(req).await
+}
+
+#[patch("/api/mode/toggle")]
+async fn patch_mode_toggle(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::toggle_mode(req, body).await
+}
+
+#[get("/api/mode/can-switch")]
+async fn get_mode_can_switch(req: HttpRequest) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::can_switch_mode(req).await
+}
+
+#[patch("/api/mode/peer-route-status")]
+async fn patch_peer_route_status(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::update_peer_route_status(req, body).await
+}
+
+#[get("/api/mode/exit-node")]
+async fn get_exit_node_info(req: HttpRequest) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::get_exit_node_info(req).await
+}
+
+#[post("/api/peer/control")]
+async fn post_peer_control(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::peer_control(req, body).await
+}
+
+#[patch("/api/peer/lan-access")]
+async fn patch_peer_lan_access(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::set_peer_lan_access(req, body).await
+}
+
+#[get("/api/peer/lan-access")]
+async fn get_peer_lan_access(req: HttpRequest) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::get_peer_lan_access_all(req).await
+}
+
+// Init endpoints (no auth required - used before config exists)
+#[get("/api/init/status")]
+async fn get_init_status(_req: HttpRequest) -> impl Responder {
+    init::get_init_status(_req).await
+}
+
+#[get("/api/init/info")]
+async fn get_init_info(_req: HttpRequest) -> impl Responder {
+    init::get_init_info(_req).await
+}
+
+#[post("/api/init")]
+async fn post_init(_req: HttpRequest, body: web::Bytes) -> impl Responder {
+    init::post_init(_req, body).await
 }
 
 #[post("/api/token")]

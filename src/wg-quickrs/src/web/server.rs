@@ -55,19 +55,102 @@ fn setup_firewall_rules(utility: PathBuf, port: u16, is_add_action: bool) {
     }
 }
 
+
 pub(crate) async fn run_web_server(config: &Config) -> std::io::Result<()> {
-    // Closure building your Actix app, reused for both HTTP and HTTPS
-    let app_factory = || {
+    run_web_server_with_config(config, false).await
+}
+
+pub(crate) async fn run_web_server_init_mode() -> std::io::Result<()> {
+    // Create a minimal config for init mode (just for port/binding)
+    let init_config = Config {
+        agent: wg_quickrs_lib::types::config::Agent {
+            web: wg_quickrs_lib::types::config::AgentWeb {
+                address: std::net::Ipv4Addr::new(0, 0, 0, 0),
+                http: wg_quickrs_lib::types::config::AgentWebHttp {
+                    enabled: true,
+                    port: 80,
+                },
+                https: wg_quickrs_lib::types::config::AgentWebHttps {
+                    enabled: false,
+                    port: 443,
+                    tls_cert: std::path::PathBuf::new(),
+                    tls_key: std::path::PathBuf::new(),
+                },
+                password: wg_quickrs_lib::types::config::Password {
+                    enabled: false,
+                    hash: String::new(),
+                },
+            },
+            vpn: wg_quickrs_lib::types::config::AgentVpn {
+                enabled: false,
+                port: 51820,
+            },
+            firewall: wg_quickrs_lib::types::config::AgentFirewall {
+                enabled: false,
+                utility: std::path::PathBuf::new(),
+                gateway: String::new(),
+            },
+            router: wg_quickrs_lib::types::config::AgentRouter::default(),
+        },
+        network: wg_quickrs_lib::types::network::Network {
+            name: String::new(),
+            subnet: "10.0.0.0/24".parse().unwrap(),
+            this_peer: uuid::Uuid::nil(),
+            peers: std::collections::BTreeMap::new(),
+            connections: std::collections::BTreeMap::new(),
+            reservations: std::collections::BTreeMap::new(),
+            defaults: wg_quickrs_lib::types::network::Defaults::default(),
+            updated_at: chrono::Utc::now(),
+        },
+    };
+    run_web_server_with_config(&init_config, true).await
+}
+
+async fn run_web_server_with_config(config: &Config, init_mode: bool) -> std::io::Result<()> {
+    // Futures for HTTP/HTTPS servers
+    let http_future = if config.agent.web.http.enabled {
+        let init_mode_clone = init_mode;
+        Some(Box::pin(async move {
+            if config.agent.firewall.enabled {
+                setup_firewall_rules(
+                    config.agent.firewall.utility.clone(),
+                    config.agent.web.http.port,
+                    true,
+                );
+            }
+
+            let bind_addr = SocketAddr::new(IpAddr::from(config.agent.web.address), config.agent.web.http.port);
+            let app_factory = move || {
         let app = App::new()
             .wrap(middleware::Compress::default())
             .service(app::web_ui_index)
+                    .service(api::get_version)
+                    .service(api::get_init_status)
+                    .service(api::get_init_info)
+                    .service(api::post_init);
+                
+                // Only add config-dependent endpoints if not in init mode
+                let app = if !init_mode_clone {
+                    app
             .service(api::post_token)
             .service(api::get_network_summary)
             .service(api::post_network_reserve_address)
-            .service(api::get_version)
             .service(api::patch_network_config)
             .service(api::post_wireguard_status)
-            .service(app::web_ui_dist);
+                        .service(api::get_mode)
+                        .service(api::patch_mode_toggle)
+                        .service(api::get_mode_can_switch)
+                        .service(api::patch_peer_route_status)
+                        .service(api::get_exit_node_info)
+                        .service(api::post_peer_control)
+                        .service(api::patch_peer_lan_access)
+                        .service(api::get_peer_lan_access)
+                } else {
+                    app
+                };
+                
+                // Register catch-all route LAST so it doesn't intercept API routes
+                let app = app.service(app::web_ui_dist);
 
         #[cfg(debug_assertions)]
         {
@@ -84,19 +167,6 @@ pub(crate) async fn run_web_server(config: &Config) -> std::io::Result<()> {
             app
         }
     };
-
-    // Futures for HTTP/HTTPS servers
-    let http_future = if config.agent.web.http.enabled {
-        Some(Box::pin(async move {
-            if config.agent.firewall.enabled {
-                setup_firewall_rules(
-                    config.agent.firewall.utility.clone(),
-                    config.agent.web.http.port,
-                    true,
-                );
-            }
-
-            let bind_addr = SocketAddr::new(IpAddr::from(config.agent.web.address), config.agent.web.http.port);
             match HttpServer::new(app_factory).bind(bind_addr) {
                 Ok(http_server) => {
                     log::info!("HTTP server listening on http://{}", bind_addr);
@@ -138,8 +208,56 @@ pub(crate) async fn run_web_server(config: &Config) -> std::io::Result<()> {
         tls_cert.push(config.agent.web.https.tls_cert.clone());
         let mut tls_key = WG_QUICKRS_CONFIG_FOLDER.get().unwrap().clone();
         tls_key.push(config.agent.web.https.tls_key.clone());
+        let init_mode_clone = init_mode;
         match load_tls_config(&tls_cert, &tls_key) {
             Ok(tls_config) => Some(Box::pin(async move {
+                let app_factory = move || {
+                    let app = App::new()
+                        .wrap(middleware::Compress::default())
+                        .service(app::web_ui_index)
+                        .service(api::get_version)
+                        .service(api::get_init_status)
+                        .service(api::get_init_info)
+                        .service(api::post_init);
+                    
+                    // Only add config-dependent endpoints if not in init mode
+                    let app = if !init_mode_clone {
+                        app
+                            .service(api::post_token)
+                            .service(api::get_network_summary)
+                            .service(api::post_network_reserve_address)
+                            .service(api::patch_network_config)
+                            .service(api::post_wireguard_status)
+                            .service(api::get_mode)
+                            .service(api::patch_mode_toggle)
+                            .service(api::get_mode_can_switch)
+                            .service(api::patch_peer_route_status)
+                            .service(api::get_exit_node_info)
+                            .service(api::post_peer_control)
+                            .service(api::patch_peer_lan_access)
+                            .service(api::get_peer_lan_access)
+                    } else {
+                        app
+                    };
+                    
+                    // Register catch-all route LAST so it doesn't intercept API routes
+                    let app = app.service(app::web_ui_dist);
+                    
+                    #[cfg(debug_assertions)]
+                    {
+                        let cors = Cors::default()
+                            .allow_any_origin()
+                            .allow_any_method()
+                            .allow_any_header()
+                            .max_age(3600);
+                        app.wrap(cors)
+                    }
+                    
+                    #[cfg(not(debug_assertions))]
+                    {
+                        app
+                    }
+                };
                 match HttpServer::new(app_factory).bind_rustls_0_23(bind_addr, tls_config) {
                     Ok(https_server) => {
                         log::info!("HTTPS server listening on https://{}", bind_addr);

@@ -1,6 +1,6 @@
 <template>
   <button :disabled="disabled"
-          class="align-middle disabled:opacity-40 bg-red-100 hover:enabled:bg-red-600 text-red-600 hover:enabled:text-white transition p-1 rounded"
+          class="align-middle disabled:opacity-40 bg-badge-error-bg hover:enabled:bg-red-600 text-badge-error-text hover:enabled:text-white transition p-1 rounded"
           :title="title"
           @click="$emit('click');">
     <!-- "trash-bin" @ https://flowbite.com/icons/ -->

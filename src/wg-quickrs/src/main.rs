@@ -14,6 +14,9 @@ mod conf;
 mod web;
 mod wireguard;
 mod helpers;
+mod mode;
+mod firewall;
+mod storage;
 
 pub static WG_QUICKRS_CONFIG_FOLDER: OnceCell<PathBuf> = OnceCell::new();
 pub static WG_QUICKRS_CONFIG_FILE: OnceCell<PathBuf> = OnceCell::new();

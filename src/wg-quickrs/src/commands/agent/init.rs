@@ -738,6 +738,7 @@ pub fn initialize_agent(init_opts: &InitOptions) -> Result<(), AgentInitError> {
                 utility: agent_firewall_utility,
                 gateway: agent_firewall_gateway,
             },
+            router: wg_quickrs_lib::types::config::AgentRouter::default(),
         },
         network: Network {
             name: network_name.to_string(),

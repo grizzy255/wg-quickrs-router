@@ -79,16 +79,42 @@ sh installer.sh --dist-tarball ./wg-quickrs-x86_64-unknown-linux-musl.tar.gz
 
 ### After installation
 
-Once the installer completes, you'll be ready to initialize your agent:
+Once the installer completes, you have two options to initialize your agent:
+
+#### Option 1: Web-based Initialization (Recommended)
+
+Start the agent without initialization - it will automatically show the web-based setup wizard:
 
 ```bash
 # System installation
+sudo wg-quickrs agent run
+
+# User installation  
+wg-quickrs --wg-quickrs-config-folder ~/.wg-quickrs agent run
+```
+
+Then open your browser to `http://localhost:9080` (or your configured address) and follow the setup wizard.
+
+#### Option 2: CLI-based Initialization
+
+Use the interactive CLI prompts or command-line flags:
+
+```bash
+# System installation (interactive prompts)
 sudo wg-quickrs agent init
 sudo wg-quickrs agent run
 
 # User installation
 wg-quickrs --wg-quickrs-config-folder ~/.wg-quickrs agent init
 wg-quickrs --wg-quickrs-config-folder ~/.wg-quickrs agent run
+
+# Non-interactive with flags (useful for automation)
+sudo wg-quickrs agent init --no-prompt true \
+  --network-name my-vpn \
+  --network-subnet 10.0.0.0/24 \
+  --agent-web-address 0.0.0.0 \
+  --agent-web-http-enabled true \
+  --agent-web-http-port 80
 ```
 
 If you set up systemd/OpenRC service, you can manage it with:

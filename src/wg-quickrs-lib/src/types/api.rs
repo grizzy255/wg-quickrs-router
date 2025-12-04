@@ -6,6 +6,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use uuid::Uuid;
 use crate::types::misc::*;
 use crate::types::network::*;
+use crate::helpers::wg_generate_key;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct Summary {
@@ -110,11 +111,16 @@ pub struct AddedPeer {
     pub dns: Dns,
     pub mtu: Mtu,
     pub scripts: Scripts,
-    pub private_key: WireGuardKey,
+    #[serde(default)]
+    pub private_key: Option<WireGuardKey>,
 }
 
 impl From<&AddedPeer> for Peer {
     fn from(added_peer: &AddedPeer) -> Self {
+        // If private_key is not provided, generate a new one
+        // This allows users to bring their own keys or have one auto-generated
+        let private_key = added_peer.private_key.clone().unwrap_or_else(|| wg_generate_key());
+        
         Peer {
             name: added_peer.name.clone(),
             address: added_peer.address,
@@ -124,7 +130,7 @@ impl From<&AddedPeer> for Peer {
             dns: added_peer.dns.clone(),
             mtu: added_peer.mtu.clone(),
             scripts: added_peer.scripts.clone(),
-            private_key: added_peer.private_key,
+            private_key,
             created_at: Utc::now(), // TODO: use time from arg
             updated_at: Utc::now(),
         }

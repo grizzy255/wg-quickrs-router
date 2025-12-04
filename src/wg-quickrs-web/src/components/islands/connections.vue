@@ -3,12 +3,12 @@
   <div v-if="other_static_peer_ids.length +  other_roaming_peer_ids.length > 0">
     <!-- selection box -->
     <div :class="field_color.attached_peers_box"
-         class="my-2 pt-2 pl-1 pr-3 shadow-md border rounded relative">
+         class="bg-card rounded-lg shadow-sm border border-divider p-5 mb-6 relative">
 
       <!-- static neighbors -->
       <div v-if="other_static_peer_ids.length > 0" class="mb-2">
         <div class="flex mx-2">
-          <span class="text-gray-800 flex items-center">
+          <span class="text-primary flex items-center">
             <strong class="text-xl mt-[1px]">Attached static peers:</strong>
           </span>
           <checkbox :checked="selectAllStaticPeers" class="ml-auto" label="Select All" size="5"
@@ -35,9 +35,9 @@
                   </svg>
                 </span>
 
-                <span class="align-middle ml-2 truncate">
-                  <strong class="text-lg">{{ network.peers[peerId].name }}</strong>
-                  {{ network.peers[peerId].address }} ({{ peerId }})
+                <span class="align-middle ml-2 truncate text-primary">
+                  <strong class="text-lg text-primary">{{ network.peers[peerId].name }}</strong>
+                  <span class="text-secondary"> {{ network.peers[peerId].address }} ({{ peerId }})</span>
                 </span>
               </label>
             </div>
@@ -49,7 +49,7 @@
       <div v-if=" other_roaming_peer_ids.length > 0" class="mb-2">
 
         <div class="flex mx-2">
-          <span class="text-gray-800 flex items-center">
+          <span class="text-primary flex items-center">
             <strong class="text-xl mt-[1px]">Attached roaming peers:</strong>
           </span>
           <checkbox :checked="selectAllRoamingPeers" class="ml-auto" label="Select All" size="5"
@@ -76,9 +76,9 @@
                   </svg>
                 </span>
 
-                <span class="align-middle ml-2 truncate">
-                  <strong class="text-lg">{{ network.peers[peerId].name }}</strong>
-                  {{ network.peers[peerId].address }} ({{ peerId }})
+                <span class="align-middle ml-2 truncate text-primary">
+                  <strong class="text-lg text-primary">{{ network.peers[peerId].name }}</strong>
+                  <span class="text-secondary"> {{ network.peers[peerId].address }} ({{ peerId }})</span>
                 </span>
               </label>
             </div>
@@ -99,7 +99,7 @@
          class="relative text-sm">
       <div v-if="all_attached_peer_ids_local.includes(otherPeerId)"
            :class="[field_color.peer_box[otherPeerId]]"
-           class="my-2 py-2 pl-1 pr-3 shadow-md border rounded overflow-x-auto whitespace-nowrap highlight-remove-box">
+           class="bg-card rounded-lg shadow-sm border border-divider p-5 mb-6 overflow-x-auto whitespace-nowrap highlight-remove-box">
 
         <!-- enabled checkbox-->
         <div class="ml-2 items-center">
@@ -119,22 +119,22 @@
                   </svg>
                 </span>
 
-            <span class="align-middle ml-2">
-                  <strong class="text-lg">{{ network.peers[otherPeerId].name }}</strong>
-                  {{ network.peers[otherPeerId].address }} ({{ otherPeerId }})
+            <span class="align-middle ml-2 text-primary">
+                  <strong class="text-lg text-primary">{{ network.peers[otherPeerId].name }}</strong>
+                  <span class="text-secondary"> {{ network.peers[otherPeerId].address }} ({{ otherPeerId }})</span>
                 </span>
           </label>
         </div>
 
         <!-- connection details  -->
-        <hr v-show="connections_local.enabled[otherPeerId]" class="h-1 mt-1 ml-2"/>
-        <div v-show="connections_local.enabled[otherPeerId]" class="mt-1 mb-0.5 text-gray-800 text-lg ml-4">
+        <hr v-show="connections_local.enabled[otherPeerId]" class="h-1 mt-1 ml-2 border-divider"/>
+        <div v-show="connections_local.enabled[otherPeerId]" class="mt-1 mb-0.5 text-primary text-lg ml-4">
 
           <!-- Pre Shared Key -->
           <div class="ml-2 flex items-center">
             <field class="inline-block whitespace-pre-wrap" field="PreSharedKey:"></field>
             <refresh-button title="Refresh PreShared Key" @click="refreshPreSharedKey(otherPeerId)"></refresh-button>
-            <span class="text-gray-800">{{ connections_local.pre_shared_key[otherPeerId] }}</span>
+            <span class="text-primary">{{ connections_local.pre_shared_key[otherPeerId] }}</span>
           </div>
 
           <!-- Persistent Keepalive -->
@@ -150,23 +150,23 @@
           </div>
 
           <!-- Allowed IPs -->
-          <div class="text-gray-800 ml-2">
+          <div class="text-primary ml-2">
             <div class="mt-0">
-              <span class="flex-none">
-                <strong>{{ network.peers[peerId].name }}</strong>
-                will forward IP subnet(s)
+              <span class="flex-none text-primary">
+                <strong class="text-primary">{{ network.peers[peerId].name }}</strong>
+                <span class="text-secondary"> will forward IP subnet(s)</span>
               </span>
               <div class="inline-block relative">
                 <input v-if="_WireGuardHelper_getConnectionId(otherPeerId).startsWith(peerId)"
                        v-model="connections_local.allowed_ips_a_to_b[otherPeerId]"
                        :class="[field_color.allowed_ips_a_to_b[otherPeerId]]"
                        :list="otherPeerId + 'focusPeerName to peerDetails.name'"
-                       class="rounded pl-1.5 pt-[2px] pb-[1px] mb-[3px] focus:outline-none focus:ring-0 border-1 border-gray-200 focus:border-gray-400 outline-none w-64 text-lg text-gray-500">
+                       class="rounded pl-1.5 pt-[2px] pb-[1px] mb-[3px] focus:outline-none focus:ring-0 border-1 border-input focus:border-input-focus outline-none w-64 text-lg text-secondary bg-input">
                 <input v-else
                        v-model="connections_local.allowed_ips_b_to_a[otherPeerId]"
                        :class="[field_color.allowed_ips_b_to_a[otherPeerId]]"
                        :list="otherPeerId + 'focusPeerName to peerDetails.name'"
-                       class="rounded pl-1.5 pt-[2px] pb-[1px] mb-[3px] focus:outline-none focus:ring-0 border-1 border-gray-200 focus:border-gray-400 outline-none w-64 text-lg text-gray-500">
+                       class="rounded pl-1.5 pt-[2px] pb-[1px] mb-[3px] focus:outline-none focus:ring-0 border-1 border-input focus:border-input-focus outline-none w-64 text-lg text-secondary bg-input">
                 <!-- Undo Button -->
                 <undo-button
                     v-if="_WireGuardHelper_getConnectionId(otherPeerId).startsWith(peerId) && field_color.allowed_ips_a_to_b[otherPeerId] !== EXISTING_FIELD_COLOR_LOOKUP.unchanged && Object.keys(network.connections).includes(_WireGuardHelper_getConnectionId(otherPeerId))"
@@ -181,24 +181,24 @@
                     @click="connections_local.allowed_ips_b_to_a[otherPeerId] = stringify_allowed_ips(network.connections[_WireGuardHelper_getConnectionId(otherPeerId)].allowed_ips_b_to_a);">
                 </undo-button>
               </div>
-              <span class="flex-none pr-2"> to <strong>{{ network.peers[otherPeerId].name }}</strong></span>
+              <span class="flex-none pr-2 text-secondary"> to <strong class="text-primary">{{ network.peers[otherPeerId].name }}</strong></span>
             </div>
             <div class="mt-0">
-              <span class="flex-none">
-                <strong>{{ network.peers[otherPeerId].name }}</strong>
-                will forward IP subnet(s)
+              <span class="flex-none text-primary">
+                <strong class="text-primary">{{ network.peers[otherPeerId].name }}</strong>
+                <span class="text-secondary"> will forward IP subnet(s)</span>
               </span>
               <div class="inline-block relative">
                 <input v-if="!_WireGuardHelper_getConnectionId(otherPeerId).startsWith(peerId)"
                        v-model="connections_local.allowed_ips_a_to_b[otherPeerId]"
                        :class="field_color.allowed_ips_a_to_b[otherPeerId]"
                        :list="otherPeerId + 'peerDetails.name to focusPeerName'"
-                       class="rounded pl-1.5 pt-[2px] pb-[1px] focus:outline-none focus:ring-0 border-1 border-gray-200 focus:border-gray-400 outline-none w-64 text-lg text-gray-500 grow">
+                       class="rounded pl-1.5 pt-[2px] pb-[1px] focus:outline-none focus:ring-0 border-1 border-input focus:border-input-focus outline-none w-64 text-lg text-secondary grow bg-input">
                 <input v-else
                        v-model="connections_local.allowed_ips_b_to_a[otherPeerId]"
                        :class="field_color.allowed_ips_b_to_a[otherPeerId]"
                        :list="otherPeerId + 'peerDetails.name to focusPeerName'"
-                       class="rounded pl-1.5 pt-[2px] pb-[1px] focus:outline-none focus:ring-0 border-1 border-gray-200 focus:border-gray-400 outline-none w-64 text-lg text-gray-500 grow">
+                       class="rounded pl-1.5 pt-[2px] pb-[1px] focus:outline-none focus:ring-0 border-1 border-input focus:border-input-focus outline-none w-64 text-lg text-secondary grow bg-input">
                 <!-- Undo Button -->
                 <undo-button
                     v-if="!_WireGuardHelper_getConnectionId(otherPeerId).startsWith(peerId) && field_color.allowed_ips_a_to_b[otherPeerId] !== EXISTING_FIELD_COLOR_LOOKUP.unchanged && Object.keys(network.connections).includes(_WireGuardHelper_getConnectionId(otherPeerId))"
@@ -213,7 +213,7 @@
                     @click="connections_local.allowed_ips_b_to_a[otherPeerId] = stringify_allowed_ips(network.connections[_WireGuardHelper_getConnectionId(otherPeerId)].allowed_ips_b_to_a);">
                 </undo-button>
               </div>
-              <span class="flex-none pr-2"> to <strong>{{ network.peers[peerId].name }}</strong></span>
+              <span class="flex-none pr-2 text-secondary"> to <strong class="text-primary">{{ network.peers[peerId].name }}</strong></span>
             </div>
             <datalist
                 :id="otherPeerId + 'focusPeerName to peerDetails.name'">

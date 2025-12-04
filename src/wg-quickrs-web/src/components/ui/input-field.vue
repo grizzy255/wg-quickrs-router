@@ -9,11 +9,11 @@
     <!-- Input -->
     <input
         :disabled="disabled || (valueField ? !modelValue.enabled : false)"
-        :class="[inputColor]"
+        :class="[inputColor, getTextColorForInput(inputColor)]"
         :list="`${label}-list`"
         :placeholder="placeholder"
         :value="valueField ? modelValue[valueField] : modelValue"
-        class="rounded pl-1.5 pt-[2px] pb-[2px] my-0.5 focus:outline-none focus:ring-0 border-1 border-gray-200 focus:border-gray-400 outline-none w-full text-lg text-gray-500 grow disabled:bg-gray-100"
+        class="rounded pl-1.5 pt-[2px] pb-[2px] my-0.5 focus:outline-none focus:ring-0 border-1 border-input focus:border-input-focus outline-none w-full text-lg grow bg-input disabled:bg-button disabled:text-muted"
         type="text"
         @input="valueField ? emit_ev(modelValue.enabled, $event.target.value) : $emit('update:modelValue', $event.target.value)"/>
 
@@ -54,6 +54,27 @@ export default {
     },
     emit_ev(enabled, value) {
       this.$emit('update:modelValue', {enabled, [this.valueField]: value});
+    },
+    getTextColorForInput(inputColor) {
+      // Return appropriate text color based on input background color
+      if (!inputColor) return 'text-primary';
+      
+      // If it's a badge background, use the corresponding badge text color
+      if (inputColor.includes('badge-success-bg')) {
+        return 'text-badge-success-text';
+      }
+      if (inputColor.includes('badge-error-bg')) {
+        return 'text-badge-error-text';
+      }
+      if (inputColor.includes('badge-warning-bg')) {
+        return 'text-badge-warning-text';
+      }
+      if (inputColor.includes('badge-info-bg')) {
+        return 'text-badge-info-text';
+      }
+      
+      // Default to primary text color
+      return 'text-primary';
     }
   },
 }

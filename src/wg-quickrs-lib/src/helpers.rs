@@ -4,6 +4,7 @@ use crate::types::misc::{WireGuardLibError};
 use x25519_dalek::{PublicKey, StaticSecret};
 use rand::RngCore;
 use uuid::Uuid;
+use ipnet::Ipv4Net;
 use crate::macros::full_version;
 
 
@@ -108,7 +109,22 @@ pub fn get_peer_wg_config(
         writeln!(wg_conf, "[Peer]").unwrap();
         writeln!(wg_conf, "PublicKey = {}", wg_public_key_from_private_key(&other_peer_details.private_key)).unwrap();
         writeln!(wg_conf, "PresharedKey = {}", connection_details.pre_shared_key).unwrap();
-        writeln!(wg_conf, "AllowedIPs = {}", allowed_ips.iter()
+        
+        // Filter out 0.0.0.0/0 from allowed IPs - exit node management is handled dynamically
+        let mut filtered_allowed_ips: Vec<_> = allowed_ips.iter()
+            .filter(|ip| {
+                let ip_str = ip.to_string();
+                ip_str != "0.0.0.0/0" && ip_str != "default"
+            })
+            .cloned()
+            .collect();
+        
+        // If no IPs remain after filtering, add the peer's own address to avoid empty AllowedIPs
+        if filtered_allowed_ips.is_empty() {
+            filtered_allowed_ips.push(Ipv4Net::new(other_peer_details.address, 32).unwrap());
+        }
+        
+        writeln!(wg_conf, "AllowedIPs = {}", filtered_allowed_ips.iter()
             .map(|net| net.to_string())
             .collect::<Vec<_>>()
             .join(", ")).unwrap();

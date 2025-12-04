@@ -1,7 +1,7 @@
 <template>
   <button :disabled="disabled"
-          :class="active ? 'bg-gray-600 text-white' : ''"
-          class="disabled:opacity-40 bg-gray-100 hover:enabled:bg-gray-600 text-gray-600 hover:enabled:text-white p-1 rounded"
+          :class="active ? 'bg-primary text-card' : ''"
+          class="disabled:opacity-40 bg-button hover:enabled:bg-primary text-secondary hover:enabled:text-card p-1 rounded"
           :title="title"
           @click="$emit('click');">
     <!-- "file-code" @ https://flowbite.com/icons/ -->

@@ -12,10 +12,10 @@
 
       <!-- title and top bar -->
       <div class="flex flex-col items-center">
-        <h3 class="text-3xl leading-6 font-medium text-gray-900 inline mb-5 text-start w-full">
+        <h3 class="text-3xl leading-tight font-medium text-primary inline mb-5 text-start w-full">
           Create a new Peer:
         </h3>
-        <span class="order-last w-full flex justify-between px-1 mb-1">
+        <span class="order-last w-full flex justify-between p-1 px-0 md:px-2 mb-1 mr-2">
           <delete-button disabled="true"
                          title="Delete this peer"
                          image-classes="h-10 w-10"></delete-button>
@@ -109,10 +109,10 @@
                    :right-button-text="'Do it!'"
                    class="z-20"
                    icon="danger">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">
+      <h3 class="text-lg leading-6 font-medium text-primary">
         Confirm adding peer <strong>{{ change_sum.added_peers[peerId].name }}</strong>
       </h3>
-      <div class="mt-2 text-sm text-gray-500">
+      <div class="mt-2 text-sm text-muted">
         Are you sure you want to add this new peer?
       </div>
 
@@ -258,6 +258,11 @@ export default {
       // check for errors + changed fields for this peer
       data.errors.peers[this.peerId] = {};
       data.added_peers[this.peerId] = JSON.parse(JSON.stringify(this.default_peer_conf));
+      // Remove private_key from default if it exists - we'll add it conditionally
+      if (data.added_peers[this.peerId].private_key) {
+        delete data.added_peers[this.peerId].private_key;
+      }
+      
       for (const island_datum of [this.peerSummaryIslandChangeSum, this.peerKindIconIslandChangeSum, this.dnsmtuIslandChangeSum, this.scriptsIslandChangeSum, this.peerDetailsIslandChangeSum]) {
         if (!island_datum) continue;
         for (const [island_field, island_value] of Object.entries(island_datum.errors)) {
@@ -278,7 +283,15 @@ export default {
               if (script_field) data.added_peers[this.peerId].scripts[script_field] = script_value;
             }
           } else {
-            if (island_value) data.added_peers[this.peerId][island_field] = island_value;
+            // Only include private_key if it's provided (not empty)
+            if (island_field === "private_key") {
+              if (island_value && island_value.trim() !== '') {
+                data.added_peers[this.peerId][island_field] = island_value.trim();
+              }
+              // If empty, don't include it - backend will auto-generate
+            } else {
+              if (island_value) data.added_peers[this.peerId][island_field] = island_value;
+            }
           }
         }
       }

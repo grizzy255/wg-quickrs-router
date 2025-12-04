@@ -1,11 +1,11 @@
 <template>
-  <div class="py-2 pl-1 pr-3 shadow-md border rounded"
+  <div class="bg-card rounded-lg shadow-sm border border-divider p-5 mb-6"
        :class="[colors.div]"
        :title="isThisPeer ? 'Cannot modify scripts for this peer remotely (security)' : 'Modify scripts'">
     <!-- Add buttons -->
     <div v-if="!isThisPeer" class="grid grid-cols-2 md:grid-cols-4 gap-2 pl-2 pb-1">
-      <div v-for="field in Object.keys(SCRIPTS_KEY_LOOKUP)" :key="field" class="items-center justify-center pt-1 border-gray-100">
-        <button class="text-gray-700 border-2 border-gray-500 py-2 px-1 rounded items-center transition w-full enabled:hover:bg-green-700 enabled:hover:border-green-700 enabled:hover:text-gray-100"
+      <div v-for="field in Object.keys(SCRIPTS_KEY_LOOKUP)" :key="field" class="items-center justify-center pt-1 border-divider">
+        <button class="text-primary border-2 border-input py-2 px-1 rounded items-center transition w-full enabled:hover:bg-green-700 enabled:hover:border-green-700 enabled:hover:text-white"
                 @click="peer_local_scripts[field].push({enabled: true, script: ''})">
           <span class="text-base inline-block whitespace-pre">+ Add a </span>
           <span class="text-base inline-block"><strong>{{ SCRIPTS_KEY_LOOKUP[field] }}</strong> Script</span>
@@ -35,7 +35,7 @@
           <!-- Undo Button -->
           <undo-button v-if="!isThisPeer && peer_local_scripts.deleted[field].has(i-1)"
                        :disabled="isThisPeer || !peer_local_scripts.deleted[field].has(i-1)"
-                       alignment-classes="right-[6px] top-[5px] bg-gray-200"
+                       alignment-classes="right-[6px] top-[5px] bg-button"
                        image-classes="h-7"
                        class="rounded"
                        @click="peer_local_scripts.deleted[field].delete(i-1)">

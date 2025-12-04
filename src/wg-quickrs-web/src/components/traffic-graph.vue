@@ -1,44 +1,32 @@
 <template>
-  <div class="w-full h-16 relative overflow-hidden">
-    <div id="traffic-graph-box" class="h-16">
-      <canvas id="traffic-graph"></canvas>
-    </div>
+  <div class="w-full h-full relative overflow-hidden">
+    <!-- Canvas with left padding for Y-axis labels -->
+    <canvas ref="trafficCanvas" class="w-full h-full"></canvas>
 
-    <!-- Tx/Rx labels on the right -->
+    <!-- Tx/Rx labels on the left (peak + current) -->
     <div
-        class="absolute top-2 left-5 flex-col items-end space-y-1 text-sm bg-white/40 px-1 py-1 rounded hidden sm:block">
-      <div class="font-semibold whitespace-pre-wrap text-blue-600/30">Tx peak ({{ telem_span }}): {{ tx_peak }}
+        class="absolute top-1 left-12 flex flex-col items-start space-y-0 text-xs bg-card/60 px-1.5 py-1 rounded backdrop-blur-sm">
+      <div class="font-semibold whitespace-pre-wrap text-blue-600/70 dark:text-blue-400/90">
+        Tx: {{ tx_avg }} <span class="text-blue-400/50 dark:text-blue-500/70">(peak {{ telem_span }}: {{ tx_peak }})</span>
       </div>
-      <div class="font-semibold whitespace-pre-wrap text-green-600/30">Rx peak ({{ telem_span }}): {{ rx_peak }}
-      </div>
-    </div>
-
-    <!-- Tx/Rx labels on the right -->
-    <div
-        class="absolute top-2 right-5 flex flex-col items-end space-y-1 text-sm bg-white/40 px-1 py-1 rounded">
-      <div class="font-semibold whitespace-pre-wrap text-blue-600/30">Tx: {{ tx_avg }}
-      </div>
-      <div class="font-semibold whitespace-pre-wrap text-green-600/30">Rx: {{ rx_avg }}
+      <div class="font-semibold whitespace-pre-wrap text-green-600/70 dark:text-green-400/90">
+        Rx: {{ rx_avg }} <span class="text-green-400/50 dark:text-green-500/70">(peak {{ telem_span }}: {{ rx_peak }})</span>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-const {Chart, LineElement, LinearScale, LineController, PointElement, Filler} = await import("chart.js");
-Chart.register(
-    LineElement,
-    LinearScale,
-    LineController,
-    PointElement,
-    Filler
-);
+import { SmoothieChart, TimeSeries } from 'smoothie';
+
+// Minimum floor: 100 Kbps in Bytes/s
+const MIN_Y_MAX = 100 * 1000 / 8; // 12,500 Bytes/s
 
 function formatThroughputBits(bytesPerSec) {
   if (!isFinite(bytesPerSec) || bytesPerSec <= 0) return "0 b/s";
 
   const factor = 1000; // SI scaling
-  let value = bytesPerSec * 8.; // convert to bits/s
+  let value = bytesPerSec * 8; // convert to bits/s
 
   const units = ["b/s", "kb/s", "Mb/s", "Gb/s", "Tb/s"];
 
@@ -55,16 +43,41 @@ function formatThroughputBits(bytesPerSec) {
   return `${text} ${units[unitIndex]}`;
 }
 
+// Format Y-axis values like OPNsense: "3.0 M", "500.00 K", etc.
+function formatYAxisBits(bytesPerSec) {
+  if (!isFinite(bytesPerSec) || bytesPerSec <= 0) return "0";
+
+  const factor = 1000; // SI scaling
+  let value = bytesPerSec * 8; // convert to bits/s
+
+  const units = ["", "K", "M", "G", "T"];
+
+  let unitIndex = 0;
+  while (value >= factor && unitIndex < units.length - 1) {
+    value /= factor;
+    unitIndex++;
+  }
+
+  // Format with 2 decimal places for cleaner display
+  if (value >= 100) {
+    return `${Math.round(value)} ${units[unitIndex]}`;
+  } else if (value >= 10) {
+    return `${value.toFixed(1)} ${units[unitIndex]}`;
+  } else {
+    return `${value.toFixed(2)} ${units[unitIndex]}`;
+  }
+}
+
 export default {
   name: "traffic-graph",
   props: {
     network: {
       type: Object,
-      default: {},
+      default: () => ({}),
     },
     telemetry: {
       type: Object,
-      default: {},
+      default: () => ({}),
     },
   },
   data() {
@@ -74,62 +87,109 @@ export default {
       tx_peak: "? b/s",
       rx_peak: "? b/s",
       telem_span: "?",
-      box_div_element: null,
-      intervalId: null,
       chart: null,
-      prevGraphMax: 0,
+      txSeries: null,
+      rxSeries: null,
+      lastTimestamp: 0,
+      darkModeObserver: null,
     }
   },
   mounted() {
-    this.box_div_element = document.getElementById('traffic-graph-box');
+    // Create TimeSeries for TX and RX
+    this.txSeries = new TimeSeries();
+    this.rxSeries = new TimeSeries();
 
-    const ctx = document.getElementById('traffic-graph');
-    const chartObj = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels: [0],
-        datasets: [
-          {
-            label: "RX",
-            borderColor: "rgba(34,197,94,0.2)", // faint green
-            backgroundColor: "rgba(34,197,94,0.05)",
-            data: [0],
-            tension: 0.3,
-            fill: "origin",
-            pointRadius: 0,
-          },
-          {
-            label: "TX",
-            borderColor: "rgba(59,130,246,0.2)", // faint blue
-            backgroundColor: "rgba(59,130,246,0.05)",
-            data: [0],
-            tension: 0.3,
-            fill: "origin",
-            pointRadius: 0,
-          },
-        ],
+    // Detect dark mode
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    // Create SmoothieChart with OPNsense-like settings
+    this.chart = new SmoothieChart({
+      responsive: true,
+      millisPerPixel: 50,           // Time density
+      minValue: 0,                  // Always start at zero
+      maxValueScale: 1.2,           // 20% headroom above max (like OPNsense)
+      scaleSmoothing: 0.3,          // Smooth scaling transitions (hysteresis effect)
+      grid: {
+        fillStyle: 'transparent',
+        strokeStyle: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.08)',
+        verticalSections: 5,        // 5 horizontal grid lines for Y-axis
+        millisPerLine: 10000,       // Vertical line every 10 seconds
+        sharpLines: true,
+        borderVisible: false,
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {},
-        scales: {x: {type: "linear", display: false}, y: {type: "linear", display: false, beginAtZero: true}},
+      labels: {
+        fillStyle: isDarkMode ? 'rgba(209, 213, 219, 0.9)' : 'rgba(80, 80, 80, 0.9)',
+        fontSize: 10,
+        precision: 0,
+        showIntermediateLabels: true,
       },
+      // Format Y-axis labels like OPNsense (bits/s with K, M, G suffixes)
+      yMaxFormatter: (max) => formatYAxisBits(max),
+      yMinFormatter: (min) => formatYAxisBits(min),
+      yIntermediateFormatter: (val) => formatYAxisBits(val),
+      timestampFormatter: (date) => {
+        // Format like OPNsense: HH:MM:SS with tick mark
+        const hours = date.getHours().toString().padStart(2, '0');
+        const mins = date.getMinutes().toString().padStart(2, '0');
+        const secs = date.getSeconds().toString().padStart(2, '0');
+        return `┬ ${hours}:${mins}:${secs}`;
+      },
+      // Enable tooltip - shows vertical line on hover
+      tooltip: true,
+      tooltipLine: {
+        lineWidth: 1,
+        strokeStyle: isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)',
+      },
+      interpolation: 'bezier',      // Smooth curves
     });
-    Object.seal(chartObj);
-    this.chart = chartObj;
+
+    // Add RX series (green) - drawn first (behind)
+    this.chart.addTimeSeries(this.rxSeries, {
+      strokeStyle: 'rgba(34, 197, 94, 0.8)',   // emerald-500
+      fillStyle: 'rgba(34, 197, 94, 0.2)',
+      lineWidth: 2,
+    });
+
+    // Add TX series (blue) - drawn second (in front)
+    this.chart.addTimeSeries(this.txSeries, {
+      strokeStyle: 'rgba(59, 130, 246, 0.8)',  // blue-500
+      fillStyle: 'rgba(59, 130, 246, 0.2)',
+      lineWidth: 2,
+    });
+
+    // Stream to canvas
+    this.chart.streamTo(this.$refs.trafficCanvas, 1000); // 1 second delay for smooth scrolling
+    
+    // Watch for dark mode changes and update chart colors
+    this.darkModeObserver = new MutationObserver(() => {
+      this.updateChartColors();
+    });
+    this.darkModeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  },
+  beforeUnmount() {
+    if (this.chart) {
+      this.chart.stop();
+    }
+    if (this.darkModeObserver) {
+      this.darkModeObserver.disconnect();
+    }
+  },
+  beforeUnmount() {
+    if (this.chart) {
+      this.chart.stop();
+    }
   },
   watch: {
     telemetry: {
       handler() {
-        if (this.telemetry === null) {
-          this.resetText();
-          return;
-        } else if (Object.keys(this.telemetry.data).length < 2) {
+        if (this.telemetry === null || !this.telemetry.data || Object.keys(this.telemetry.data).length < 2) {
           this.resetText();
           return;
         }
+
         const txs = [];
         const rxs = [];
         const timestamps = [];
@@ -141,8 +201,7 @@ export default {
             continue;
           }
 
-          let tx = 0,
-              rx = 0;
+          let tx = 0, rx = 0;
           const ts = (telem_data.timestamp - prev_telem_data.timestamp) / 1000;
 
           for (const [connection_id, telemetry_details] of Object.entries(telem_data.datum)) {
@@ -157,24 +216,20 @@ export default {
             }
           }
 
+          // Rates in Bytes/s
           txs.push(tx / ts);
           rxs.push(rx / ts);
           timestamps.push(telem_data.timestamp);
           prev_telem_data = telem_data;
-
         }
+
+        // Update text labels
         const tx_avg = formatThroughputBits(txs.at(-1));
         const rx_avg = formatThroughputBits(rxs.at(-1));
         const maxAvgLen = Math.max(tx_avg.length, rx_avg.length);
         this.tx_avg = tx_avg.padStart(maxAvgLen, " ");
         this.rx_avg = rx_avg.padStart(maxAvgLen, " ");
 
-        let latest_timestamp_dt = timestamps.at(-1) - timestamps.at(-2);
-        while (txs.length < this.telemetry.max_len - 1) {
-          txs.unshift(0);
-          rxs.unshift(0);
-          timestamps.unshift(timestamps[0] - latest_timestamp_dt);
-        }
         const tx_peak_n = Math.max(...txs);
         const rx_peak_n = Math.max(...rxs);
         const tx_peak = formatThroughputBits(tx_peak_n);
@@ -182,17 +237,19 @@ export default {
         const maxPeakLen = Math.max(tx_peak.length, rx_peak.length);
         this.tx_peak = tx_peak.padStart(maxPeakLen, " ");
         this.rx_peak = rx_peak.padStart(maxPeakLen, " ");
-        this.telem_span = `${Math.round((this.telemetry.data.at(-1).timestamp - this.telemetry.data[0].timestamp) / 1000.)}s`;
+        this.telem_span = `${Math.round((this.telemetry.data.at(-1).timestamp - this.telemetry.data[0].timestamp) / 1000)}s`;
 
-        // Update the chart directly
-        this.chart.data.labels = timestamps;
-        this.chart.options.scales.x.min = timestamps[0];
-        this.chart.options.scales.x.max = timestamps.at(-1);
-        this.chart.data.datasets[0].data = rxs;
-        this.chart.data.datasets[1].data = txs;
-        let ratio_new_data = latest_timestamp_dt / (timestamps.at(-1) - timestamps[0]);
-        this.resetMove(ratio_new_data, Math.max(tx_peak_n, rx_peak_n) * 1.03);
-        this.chart.update();
+        // Add latest data point to Smoothie TimeSeries
+        const latestTimestamp = timestamps.at(-1);
+        const latestTx = txs.at(-1) || 0;
+        const latestRx = rxs.at(-1) || 0;
+
+        // Only add new points (avoid duplicates)
+        if (latestTimestamp > this.lastTimestamp) {
+          this.txSeries.append(latestTimestamp, latestTx);
+          this.rxSeries.append(latestTimestamp, latestRx);
+          this.lastTimestamp = latestTimestamp;
+        }
       },
       deep: true
     }
@@ -205,32 +262,25 @@ export default {
       this.rx_peak = "? b/s";
       this.telem_span = "?";
     },
-    resetMove(ratio, newGraphMax) {
-      if (this.intervalId) {
-        clearInterval(this.intervalId);
-        this.intervalId = null;
+    updateChartColors() {
+      if (!this.chart) return;
+      
+      const isDarkMode = document.documentElement.classList.contains('dark');
+      
+      // Update grid colors
+      this.chart.options.grid.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.08)';
+      
+      // Update label colors
+      this.chart.options.labels.fillStyle = isDarkMode ? 'rgba(209, 213, 219, 0.9)' : 'rgba(80, 80, 80, 0.9)';
+      
+      // Update tooltip line color
+      if (this.chart.options.tooltipLine) {
+        this.chart.options.tooltipLine.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
       }
-      const duration = 1000.;
-      const refresh_interval = 40.; // 25Hz
-      const total_margin = ratio * this.box_div_element.getBoundingClientRect().width
-      this.box_div_element.style.marginLeft = `${Math.round(-2. * total_margin)}px`;
-      this.box_div_element.style.transform = `translateX(${Math.round(total_margin)}px)`;
-
-      let start_time = Date.now();
-      this.intervalId = setInterval(() => {
-        const pos = (Date.now() - start_time) / duration;
-        const total_transform = total_margin * (1. - pos);
-        this.box_div_element.style.transform = `translateX(${Math.round(total_transform)}px)`;
-
-        // minimize the number of chart.update calls
-        if (newGraphMax !== this.prevGraphMax) {
-          // If pos > 0.9, complete y-axis scaling animation
-          this.chart.options.scales.y.max = this.prevGraphMax + (newGraphMax - this.prevGraphMax) * (pos > 0.9 ? 1. : pos);
-          this.prevGraphMax = this.chart.options.scales.y.max;
-          this.chart.update();
-        }
-      }, refresh_interval); // roughly every interval milliseconds
-    }
+      
+      // Redraw the chart with new colors
+      this.chart.render();
+    },
   }
 }
 </script>

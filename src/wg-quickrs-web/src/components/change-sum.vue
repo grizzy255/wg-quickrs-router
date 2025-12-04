@@ -1,59 +1,59 @@
 <template>
 
-  <div class="text-sm text-gray-500 whitespace-pre grid grid-cols-2 gap-1">
-    <div v-if="is_full(pruned_errors)" class="col-span-2 bg-red-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-red-200 rounded-md p-1">
-        <strong class="text-gray-600">Errors</strong>
+  <div class="text-sm text-secondary whitespace-pre grid grid-cols-2 gap-1">
+    <div v-if="is_full(pruned_errors)" class="col-span-2 bg-badge-error-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-error-bg rounded-md p-1">
+        <strong class="text-badge-error-text">Errors</strong>
       </div>
-      <div class="text-sm text-gray-700 p-1">
+      <div class="text-sm text-primary p-1">
         {{ JSON.stringify(pruned_errors, false, 2) }}
       </div>
     </div>
-    <div v-if="is_full(pruned_changed_fields)" class="col-span-2 bg-blue-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-blue-200 rounded-md p-1">
-        <strong class="text-gray-600">Changed Fields</strong>
+    <div v-if="is_full(pruned_changed_fields)" class="col-span-2 bg-badge-info-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-info-bg rounded-md p-1">
+        <strong class="text-badge-info-text">Changed Fields</strong>
       </div>
-      <div class="text-sm text-gray-700 p-1">
+      <div class="text-sm text-primary p-1">
         {{ JSON.stringify(pruned_changed_fields, false, 2) }}
       </div>
     </div>
-    <div v-if="is_full(changeSum.added_peers)" class="col-span-2 bg-green-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-green-200 rounded-md p-1">
-        <strong class="text-gray-600">Added Peer</strong>
+    <div v-if="is_full(changeSum.added_peers)" class="col-span-2 bg-badge-success-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-success-bg rounded-md p-1">
+        <strong class="text-badge-success-text">Added Peer</strong>
       </div>
-      <div class="text-sm text-gray-700 p-1">
+      <div class="text-sm text-primary p-1">
         {{ JSON.stringify(padded_added_peers, false, 2) }}
       </div>
     </div>
-    <div v-if="is_full(changeSum.added_connections)" class="col-span-2 bg-green-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-green-200 rounded-md p-1">
-        <strong class="text-gray-600">Added Connections</strong>
+    <div v-if="is_full(changeSum.added_connections)" class="col-span-2 bg-badge-success-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-success-bg rounded-md p-1">
+        <strong class="text-badge-success-text">Added Connections</strong>
       </div>
-      <div class="text-sm text-gray-700 p-1">
+      <div class="text-sm text-primary p-1">
         {{ JSON.stringify(changeSum.added_connections, false, 2) }}
       </div>
     </div>
-    <div v-if="is_full(changeSum.removed_connections)" class="col-span-2 bg-red-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-red-200 rounded-md p-1">
-        <strong class="text-gray-600">Removed Connections</strong>
+    <div v-if="is_full(changeSum.removed_connections)" class="col-span-2 bg-badge-error-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-error-bg rounded-md p-1">
+        <strong class="text-badge-error-text">Removed Connections</strong>
       </div>
-      <div class="text-sm text-gray-700 p-1">
+      <div class="text-sm text-primary p-1">
         {{ JSON.stringify(changeSum.removed_connections, false, 2) }}
       </div>
     </div>
-    <div v-if="Object.keys(network.peers).includes(peerId)" class="bg-gray-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-gray-200 rounded-md p-1">
-        <strong class="text-gray-600">Old Configuration</strong>
+    <div v-if="Object.keys(network.peers).includes(peerId)" class="bg-card rounded-md overflow-scroll border border-divider">
+      <div class="flex items-center justify-center bg-button rounded-md p-1">
+        <strong class="text-secondary">Old Configuration</strong>
       </div>
-      <span class="text-sm text-gray-700 p-1">
+      <span class="text-sm text-primary p-1">
         {{ JSON.stringify({peers: pruned_network.peers, connections: pruned_network.connections}, false, 2) }}
       </span>
     </div>
-    <div v-if="Object.keys(network.peers).includes(peerId)" class="bg-green-100 rounded-md overflow-scroll">
-      <div class="flex items-center justify-center bg-green-200 rounded-md p-1">
-        <strong class="text-gray-600">New Configuration</strong>
+    <div v-if="Object.keys(network.peers).includes(peerId)" class="bg-badge-success-bg rounded-md overflow-scroll">
+      <div class="flex items-center justify-center bg-badge-success-bg rounded-md p-1">
+        <strong class="text-badge-success-text">New Configuration</strong>
       </div>
-      <span class="text-sm text-gray-700 p-1">
+      <span class="text-sm text-primary p-1">
         {{ JSON.stringify({peers: new_network.peers, connections: new_network.connections}, false, 2) }}
       </span>
     </div>

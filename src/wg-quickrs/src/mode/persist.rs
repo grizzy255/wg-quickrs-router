@@ -1,0 +1,197 @@
+// All persistent state across restarts:
+// last mode, LAN CIDR, peer table mapping, prefix active/backup state
+//
+// Responsibilities:
+// - STEP 2: Persist mode state (restart logic)
+// - STEP 7: Persist peer table mappings and prefix active/backup state
+
+use super::mode::SystemMode;
+use crate::WG_QUICKRS_CONFIG_FOLDER;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use thiserror::Error;
+
+const MODE_STATE_FILE: &str = "router_mode_state.json";
+
+#[derive(Error, Debug)]
+pub enum PersistenceError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ModeState {
+    pub last_mode: SystemMode,
+    pub lan_cidr: Option<String>,
+    pub peer_table_ids: HashMap<String, u32>, // peer_id -> table_id
+    pub prefix_active_backup: HashMap<String, PrefixState>, // prefix -> state
+    #[serde(default)]
+    pub peer_first_handshake: HashMap<String, u64>, // peer_id -> first_handshake_timestamp (Unix seconds)
+    #[serde(default)]
+    pub peer_last_online_state: HashMap<String, bool>, // peer_id -> was_online (tracks previous online state)
+    #[serde(default)]
+    pub peer_last_successful_ping: HashMap<String, u64>, // peer_id -> last_successful_ping_timestamp (Unix seconds)
+    #[serde(default = "default_peer_lan_access")]
+    pub peer_lan_access: HashMap<String, bool>, // peer_id -> has_lan_access (default true)
+}
+
+fn default_peer_lan_access() -> HashMap<String, bool> {
+    HashMap::new() // Empty means all peers default to having LAN access
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PrefixState {
+    pub active_peer_id: String,
+    pub backup_peer_ids: Vec<String>,
+}
+
+fn get_state_file_path() -> Result<PathBuf, PersistenceError> {
+    let config_folder = WG_QUICKRS_CONFIG_FOLDER
+        .get()
+        .ok_or_else(|| PersistenceError::IoError(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Config folder not initialized"
+        )))?;
+    
+    Ok(config_folder.join(MODE_STATE_FILE))
+}
+
+// Save mode state to file
+pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
+    let file_path = get_state_file_path()?;
+    
+    // Ensure config folder exists
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| PersistenceError::IoError(e))?;
+    }
+    
+    // Serialize to JSON
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| PersistenceError::SerializationError(e.to_string()))?;
+    
+    // Write to file
+    let mut file = File::create(&file_path)
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
+    file.write_all(json.as_bytes())
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
+    log::info!("Saved router mode state to {:?}", file_path);
+    Ok(())
+}
+
+// Load mode state from file
+pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
+    let file_path = get_state_file_path()?;
+    
+    // Check if file exists
+    if !file_path.exists() {
+        return Ok(None);
+    }
+    
+    // Read file
+    let mut file = File::open(&file_path)
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
+    // Deserialize from JSON
+    let state: ModeState = serde_json::from_str(&contents)
+        .map_err(|e| PersistenceError::DeserializationError(e.to_string()))?;
+    
+    log::info!("Loaded router mode state from {:?}", file_path);
+    Ok(Some(state))
+}
+
+// Clear mode state (when switching to Host Mode)
+pub fn clear_mode_state() -> Result<(), PersistenceError> {
+    let file_path = get_state_file_path()?;
+    
+    // Delete the state file if it exists
+    if file_path.exists() {
+        fs::remove_file(&file_path)
+            .map_err(|e| PersistenceError::IoError(e))?;
+        log::info!("Cleared router mode state file {:?}", file_path);
+    }
+    
+    Ok(())
+}
+
+/// Validate persisted state against current config and clean up orphaned entries
+/// Returns true if state is valid (has matching peers), false if it's a fresh start
+pub fn validate_and_cleanup_persisted_state(
+    state: &mut ModeState,
+    current_peer_ids: &HashSet<String>,
+) -> bool {
+    // Collect peer IDs from persisted state
+    let persisted_peer_ids: HashSet<String> = state.peer_table_ids.keys().cloned().collect();
+    
+    // Find matching peers (peers that exist in both persisted state and current config)
+    let matching_peers: HashSet<String> = persisted_peer_ids
+        .intersection(current_peer_ids)
+        .cloned()
+        .collect();
+    
+    // If no peers match, it's a fresh start
+    if matching_peers.is_empty() {
+        log::info!("No matching peers found between persisted state and current config. This appears to be a fresh start.");
+        return false;
+    }
+    
+    // Clean up orphaned entries (peers that exist in persisted state but not in current config)
+    let orphaned_peers: Vec<String> = persisted_peer_ids
+        .difference(current_peer_ids)
+        .cloned()
+        .collect();
+    
+    if !orphaned_peers.is_empty() {
+        log::info!("Found {} orphaned peer(s) in persisted state that don't exist in current config. Cleaning up...", orphaned_peers.len());
+        
+        for peer_id in &orphaned_peers {
+            // Remove from peer_table_ids
+            state.peer_table_ids.remove(peer_id);
+            
+            // Remove from peer health tracking
+            state.peer_first_handshake.remove(peer_id);
+            state.peer_last_online_state.remove(peer_id);
+            state.peer_last_successful_ping.remove(peer_id);
+            
+            // Remove from peer LAN access settings
+            state.peer_lan_access.remove(peer_id);
+            
+            // Remove from prefix_active_backup if this peer was an exit node
+            state.prefix_active_backup.retain(|_prefix, prefix_state| {
+                let mut updated = false;
+                
+                // Remove if this peer was the active peer
+                if prefix_state.active_peer_id == *peer_id {
+                    updated = true;
+                }
+                
+                // Remove from backup peer list
+                prefix_state.backup_peer_ids.retain(|id| id != peer_id);
+                
+                !updated
+            });
+            
+            log::debug!("Removed orphaned peer {} from persisted state", peer_id);
+        }
+        
+        log::info!("Cleaned up {} orphaned peer(s) from persisted state", orphaned_peers.len());
+    }
+    
+    log::info!("Validated persisted state: {} matching peer(s) found", matching_peers.len());
+    true
+}
+

@@ -1,11 +1,199 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* CSS Variables for Centralized Dark Mode */
+:root {
+  /* Backgrounds */
+  --bg-page: #f3f4f6;           /* gray-100 */
+  --bg-card: #ffffff;            /* white */
+  --bg-header: #ffffff;          /* white */
+  --bg-button: #e5e7eb;          /* gray-200 */
+  --bg-button-hover: #d1d5db;    /* gray-300 */
+  --bg-input: #ffffff;           /* white */
+  --bg-dropdown: #ffffff;        /* white */
+  --bg-backdrop: rgba(107, 114, 128, 0.75); /* gray-500 with opacity */
+  
+  /* Text */
+  --text-primary: #111827;       /* gray-900 */
+  --text-secondary: #4b5563;      /* gray-700 - improved contrast */
+  --text-muted: #9ca3af;         /* gray-400 */
+  --text-icon: #6b7280;          /* gray-600 - improved visibility */
+  --text-button: #374151;        /* gray-700 */
+  
+  /* Borders */
+  --border-default: #e5e7eb;     /* gray-200 */
+  --border-divider: #e5e7eb;     /* gray-200 */
+  --border-input: #d1d5db;       /* gray-300 */
+  --border-input-error: #ef4444; /* red-500 */
+  
+  /* Status Badges (light mode) */
+  --badge-success-bg: #d1fae5;   /* green-100 */
+  --badge-success-text: #065f46; /* green-800 */
+  --badge-success-border: #86efac; /* green-300 */
+  --badge-error-bg: #fee2e2;     /* red-100 */
+  --badge-error-text: #991b1b;   /* red-800 */
+  --badge-error-border: #fca5a5; /* red-300 */
+  --badge-warning-bg: #fef3c7;    /* yellow-100 */
+  --badge-warning-text: #92400e;  /* yellow-800 */
+  --badge-warning-border: #fde047; /* yellow-300 */
+  --badge-info-bg: #dbeafe;      /* blue-50 */
+  --badge-info-text: #1e40af;    /* blue-600 */
+  --badge-info-border: #93c5fd;  /* blue-300 */
+}
+
+.dark {
+  /* Backgrounds */
+  --bg-page: #111827;            /* gray-900 */
+  --bg-card: #1f2937;            /* gray-800 */
+  --bg-header: #1f2937;          /* gray-800 */
+  --bg-button: #374151;           /* gray-700 */
+  --bg-button-hover: #4b5563;    /* gray-600 */
+  --bg-input: #1f2937;           /* gray-800 */
+  --bg-dropdown: #1f2937;        /* gray-800 */
+  --bg-backdrop: rgba(0, 0, 0, 0.75);
+  
+  /* Text */
+  --text-primary: #f9fafb;        /* gray-50 */
+  --text-secondary: #9ca3af;     /* gray-400 */
+  --text-muted: #9ca3af;         /* gray-400 */
+  --text-icon: #6b7280;          /* gray-500 */
+  --text-button: #d1d5db;        /* gray-300 */
+  
+  /* Borders */
+  --border-default: #374151;     /* gray-700 */
+  --border-divider: #374151;     /* gray-700 */
+  --border-input: #4b5563;       /* gray-600 */
+  --border-input-error: #f87171; /* red-400 */
+  
+  /* Status Badges (dark mode) */
+  --badge-success-bg: rgba(6, 78, 59, 0.5);  /* green-900/50 */
+  --badge-success-text: #6ee7b7;              /* green-300 */
+  --badge-success-border: #10b981;           /* green-500 */
+  --badge-error-bg: rgba(127, 29, 29, 0.5);   /* red-900/50 */
+  --badge-error-text: #fca5a5;                /* red-300 */
+  --badge-error-border: #f87171;              /* red-400 */
+  --badge-warning-bg: rgba(113, 63, 18, 0.5); /* yellow-900/50 */
+  --badge-warning-text: #fcd34d;              /* yellow-300 */
+  --badge-warning-border: #fbbf24;            /* yellow-400 */
+  --badge-info-bg: rgba(30, 58, 138, 0.3);    /* blue-900/30 */
+  --badge-info-text: #93c5fd;                 /* blue-400 */
+  --badge-info-border: #60a5fa;               /* blue-400 */
+}
+
+@layer utilities {
+    /* Semantic color utilities using CSS variables */
+    .bg-page { background-color: var(--bg-page); }
+    .bg-card { background-color: var(--bg-card); }
+    .bg-header { background-color: var(--bg-header); }
+    .bg-button { background-color: var(--bg-button); }
+    .bg-button-hover { background-color: var(--bg-button-hover); }
+    .bg-input { background-color: var(--bg-input); }
+    .bg-dropdown { background-color: var(--bg-dropdown); }
+    .bg-backdrop { background-color: var(--bg-backdrop); }
+    
+    .text-primary { color: var(--text-primary); }
+    .text-secondary { color: var(--text-secondary); }
+    .text-muted { color: var(--text-muted); }
+    .text-icon { color: var(--text-icon); }
+    .text-button { color: var(--text-button); }
+    
+    .border-default { border-color: var(--border-default); }
+    .border-divider { border-color: var(--border-divider); }
+    .border-input { border-color: var(--border-input); }
+    .border-input-error { border-color: var(--border-input-error); }
+    
+    .bg-badge-success-bg { background-color: var(--badge-success-bg); }
+    .text-badge-success-text { color: var(--badge-success-text); }
+    .border-badge-success-border { border-color: var(--badge-success-border); }
+    .bg-badge-error-bg { background-color: var(--badge-error-bg); }
+    .text-badge-error-text { color: var(--badge-error-text); }
+    .border-badge-error-border { border-color: var(--badge-error-border); }
+    .bg-badge-warning-bg { background-color: var(--badge-warning-bg); }
+    .text-badge-warning-text { color: var(--badge-warning-text); }
+    .border-badge-warning-border { border-color: var(--badge-warning-border); }
+    .bg-badge-info-bg { background-color: var(--badge-info-bg); }
+    .text-badge-info-text { color: var(--badge-info-text); }
+    .border-badge-info-border { border-color: var(--badge-info-border); }
+}
+
 @layer components {
     input[type="checkbox"] {
-        @apply cursor-pointer transition-all appearance-none rounded shadow hover:shadow-md border bg-gray-100 border-slate-300 checked:bg-blue-600 checked:border-blue-600;
+        @apply cursor-pointer transition-all appearance-none rounded shadow hover:shadow-md border;
+        background-color: var(--bg-input);
+        border-color: var(--border-input);
+    }
+    
+    input[type="checkbox"]:checked {
+        @apply bg-blue-600 border-blue-600;
     }
 }
 
 button {
     @apply enabled:cursor-pointer;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply transition-all duration-200;
+}
+
+/* Dark mode transition */
+html {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+    background: var(--bg-card);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: var(--bg-button);
+    border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--bg-button-hover);
+}
+
+/* Light mode scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-page);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-button);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--bg-button-hover);
+}
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+    @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Improved card shadows */
+.shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dark .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth transitions for all interactive elements */
+a, button, [role="button"] {
+    @apply transition-all duration-200;
 }

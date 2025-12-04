@@ -17,7 +17,7 @@
 
       <!-- title and top bar -->
       <div class="flex flex-col items-center">
-        <h3 class="text-3xl leading-tight font-medium text-gray-900 inline mb-5 text-start w-full">
+        <h3 class="text-3xl leading-tight font-medium text-primary inline mb-5 text-start w-full">
           Configuration for <strong>{{ peer_conf.name }}</strong>:
         </h3>
         <span class="order-last w-full flex justify-between p-1 px-0 md:px-2 mb-1 mr-2">
@@ -42,7 +42,7 @@
           <qr-button :disabled="changeDetected || errorDetected"
                      image-classes="h-10 w-10"
                      title="Show QR Code"
-                     @click="drawQRCode(); overlayDialogId = 'qr'"></qr-button>
+                     @click="overlayDialogId = 'qr'; $nextTick(() => drawQRCode())"></qr-button>
           <download-button :disabled="changeDetected || errorDetected"
                            image-classes="h-10 w-10"
                            title="Download Configuration"
@@ -53,7 +53,7 @@
       <div class="flex max-h-[calc(100vh-20rem)] flex-col overflow-y-auto">
         <!-- show config -->
         <div v-show="page === 'file'" class="mt-2 w-full overflow-scroll text-start">
-          <span class="text-sm text-gray-500 whitespace-pre">{{ peer_wg_conf_file }}</span>
+          <span class="text-sm text-muted whitespace-pre">{{ peer_wg_conf_file }}</span>
         </div>
 
         <!-- edit config -->
@@ -113,10 +113,10 @@
                    :right-button-text="'Do it!'"
                    class="z-20"
                    icon="danger">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">
+      <h3 class="text-lg leading-6 font-medium text-primary">
         Confirm changes for <strong>{{ peer_conf.name }}</strong>
       </h3>
-      <div class="my-2 text-sm text-gray-500">
+      <div class="my-2 text-sm text-muted">
         Are you sure you want to make these changes?
       </div>
 
@@ -136,22 +136,22 @@
                    :right-button-text="'Delete!'"
                    class="z-20"
                    icon="danger">
-      <h3 class="text-lg leading-6 font-medium text-gray-900">
+      <h3 class="text-lg leading-6 font-medium text-primary">
         Confirm deleting <strong>{{ peer_conf.name }}</strong>
       </h3>
-      <div class="my-2 text-sm text-gray-500">
+      <div class="my-2 text-sm text-muted">
         Are you sure you want to delete this peer?
       </div>
     </custom-dialog>
 
     <!-- Window: QR Code Display -->
-    <div v-show="overlayDialogId === 'qr'">
-      <div class="bg-black bg-opacity-50 fixed top-0 right-0 left-0 bottom-0 flex items-center justify-center z-20">
-        <div class="bg-white rounded-md shadow-lg relative p-8">
-          <button class="absolute right-4 top-4 text-gray-600 hover:text-gray-800" @click="overlayDialogId = ''">
+    <div v-if="overlayDialogId === 'qr'">
+      <div class="bg-backdrop fixed inset-0 flex items-center justify-center z-[60]">
+        <div class="bg-card rounded-md shadow-lg relative p-8">
+          <button class="absolute right-4 top-4 text-secondary hover:text-primary" @click="overlayDialogId = ''">
             <img alt="Close QR Code Window" class="h-6" src="/icons/flowbite/close.svg"/>
           </button>
-          <canvas id="qr-canvas"></canvas>
+          <canvas id="qr-canvas" class="block"></canvas>
         </div>
       </div>
     </div>
@@ -270,7 +270,12 @@ export default {
       this.api.patch_network_config(changeSum);
     },
     drawQRCode() {
-      QRCode.toCanvas(document.getElementById('qr-canvas'), this.peer_wg_conf_file);
+      const canvas = document.getElementById('qr-canvas');
+      if (canvas) {
+        QRCode.toCanvas(canvas, this.peer_wg_conf_file).catch(err => {
+          console.error('Failed to generate QR code:', err);
+        });
+      }
     },
     downloadPeerConfig() {
       const peerConfigFileContents = get_peer_wg_config_wasm(this.network, this.peerId);

@@ -1,5 +1,5 @@
 <template>
-  <div :class="[colors.div]" class="my-2 py-2 pl-1 pr-3 shadow-md border rounded">
+  <div :class="[colors.div]" class="bg-card rounded-lg shadow-sm border border-divider p-5 mb-6">
     <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
       <!--  Kind  -->
       <input-field v-model="peer_local.kind" :input-color="colors.kind"
