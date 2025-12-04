@@ -1,65 +1,186 @@
-# wg-quickrs
+# wg-quickrs (Gateway Edition)
 
-> **🆕 What's New**
-> 
-> - **Router Mode** - Transform your host into a VPN gateway with exit node selection
-> - **Per-Peer LAN Access Control** - Allow/deny individual peers access to your local network
-> - **Multiple LAN Subnet Support** - Configure multiple comma-separated CIDRs for LAN access rules
-> - **Real-time Health Monitoring** - Live latency, packet loss, and jitter metrics for exit nodes
-> - **Web-based Initialization Wizard** - Configure everything from the browser on first run
-> - **Enhanced Traffic Analysis** - Improved graphs with tooltips and timeline markers
-> - **Redesigned Dashboard** - Three-card layout: System Health, Control Center, and Gateway Status
+> 🔀 A WireGuard management tool with Router Mode for CGNAT/cellular peers
 
----
+## 🙏 Credits
 
-[![License](https://img.shields.io/github/license/godofkebab/wg-quickrs?logo=GitHub&color=brightgreen)](https://github.com/GodOfKebab/wg-quickrs)
-![Static Badge](https://img.shields.io/badge/amd64%20%7C%20arm64%20%7C%20arm%2Fv7%20%20-%20grey?label=arch)
-![Static Badge](https://img.shields.io/badge/Linux%20%7C%20macOS%20%20-%20black?label=platform)
+- Original project: [GodOfKebab/wg-quickrs](https://github.com/GodOfKebab/wg-quickrs)
+- Built with Rust, Vue.js, and WireGuard
 
-[![Release](https://img.shields.io/github/v/tag/godofkebab/wg-quickrs?logo=github&label=latest%20tag&color=blue)](https://github.com/godofkebab/wg-quickrs/releases/latest)
-[![Docker](https://img.shields.io/docker/image-size/godofkebab/wg-quickrs?logo=docker&color=%232496ED)](https://hub.docker.com/repository/docker/godofkebab/wg-quickrs)
-[![Docker](https://img.shields.io/docker/pulls/godofkebab/wg-quickrs?logo=docker&color=%232496ED)](https://hub.docker.com/repository/docker/godofkebab/wg-quickrs/tags)
-![Dynamic TOML Badge](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FGodOfKebab%2Fwg-quickrs%2Frefs%2Fheads%2Fmain%2Fsrc%2Fwg-quickrs%2FCargo.toml&query=package.rust-version&logo=rust&label=rust&color=%23000000)
-![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FGodOfKebab%2Fwg-quickrs%2Frefs%2Fheads%2Fmain%2Fsrc%2Fwg-quickrs-web%2Fpackage.json&query=dependencies.vue&logo=vue.js&label=vue&color=%234FC08D)
+> ⚠️ **Note:** This project was coded entirely with AI (Claude/Cursor). Please excuse any inefficiencies — contributions and improvements are welcome!
 
-✨ An intuitive multi-peer `wg` wrapper written in 🦀 Rust (`wg-quick` alternative).
+## 💡 What do I use it for?
 
-⚡ Rust + Vue + WASM + WireGuard = 🧪 one [static binary](docs/notes/static-binary.md) + 📝 one [YAML file](docs/notes/schema.md) to rule them all 🪄
-
-Run it on your [router](docs/quick-start/router.md), [server](docs/quick-start/server.md), or [docker host](docs/quick-start/docker.md) and manage your WireGuard VPN from a [terminal](docs/quick-start/cli.md) or a web interface.
-
-<p align="center">
-  <img src="https://yasar.idikut.cc/project-assets/wg-quickrs-speedtest.gif" alt="speedtest demo">
-</p>
-
-<p align="center">
-  <img src="https://yasar.idikut.cc/project-assets/wg-quickrs-demo.gif" alt="usage demo">
-</p>
-
-Features:
-- Interactive graph to configure your P2P network
-- HTTPS support and password login with JWT-based API authentication
-- Automatic firewall/NAT setup (`iptables` for Debian/Linux or `pf` for macOS, both usually come preinstalled with the OS)
-- **Router Mode** with exit node selection - route all traffic through a remote peer
-- **Per-peer LAN access control** - selectively allow/deny peers access to your local network
-- **Real-time traffic analysis** with bandwidth graphs
-- **Web-based initialization wizard** - configure everything from the browser
-- If you are not feeling like dealing with VPN/networking on your machine, you can also just use the CLI or the web console to create `.conf` files/QR codes for your network peers.
+- Pointing Apple TV to a Pi installed in my parents house to see Geo-blocked content.
 
 ---
 
-## Quick Start
+## 🎯 Problem Statement
 
-To get started, see quick start guides for [routers](docs/quick-start/router.md), [servers](docs/quick-start/server.md), or [docker hosts](docs/quick-start/docker.md).
+I wanted to use remote sites as exit nodes for internet traffic, but those sites were stuck behind **CGNAT** (cellular/ISP firewalls). This meant I couldn't just "dial in" to them.
 
-## Router Mode
+### Technical Implications (UniFi Context)
 
-Router Mode transforms your wg-quickrs host into a VPN gateway, allowing connected peers to route their internet traffic through a remote exit node.
+| Mode | Limitation |
+|------|------------|
+| **Client Mode VPN** | Not possible for PBR on LAN hosts — remote site has no public IP to accept connections |
+| **Server Mode VPN** | Peers can connect, but UniFi lacks granular PBR to control traffic flow per peer |
 
-**Features:**
-- **Exit Node Selection** - Choose which peer to route traffic through
-- **LAN Access Control** - Per-peer toggle to allow/deny access to your local network (supports multiple LAN subnets)
-- **Health Monitoring** - Real-time latency, packet loss, and jitter metrics for the exit node
-- **Automatic Routing** - Policy-based routing (PBR) with automatic iptables/firewall rule management
+**The Goal:** A solution that acts as a rendezvous point for NAT-restricted peers while providing the advanced routing logic required to manage traffic flow.
 
-See [Router Mode Guide](docs/notes/router-mode.md) for detailed configuration.
+---
+
+## 🛠️ The Solution
+
+**wg-quickrs Gateway Edition** acts as a central intelligent rendezvous point.
+
+Deploy on a Linux host in your LAN with a public IP (or port forwarding) to:
+
+1. **Get Around CGNAT** — Peers initiate outbound connections to this server
+2. **Granular PBR** — Per-peer routing tables with overlapping route support
+3. **Exit Node Selection** — Manually switch traffic to exit through the exit node
+4. **LAN Bridging** — Automatic iptables masquerading to bridge peers into internal subnets
+5. **Access Control** — Allow or deny LAN access per peer - Good for phones to be able to access Exit nodes, but not your LAN
+
+```
+                                                     ┌─────────────────────┐
+                                                ┌───▶│  Exit Node Peer 1   │───▶ Internet
+                                                │    │  (Remote Site/CGNAT)│     (via Peer 1 IP)
+                                                │    └─────────────────────┘
+┌─────────────────┐                             │
+│  iPhone         │──┐                          │
+│  (CGNAT/LTE)    │  │    ┌─────────────────────┴──┐
+└─────────────────┘  │    │                        │
+                     ├───▶│   wg-quickrs Gateway   │
+┌─────────────────┐  │    │                        │
+│  LAN Devices    │──┤    │  • Per-peer route table│
+│    Apple TV     │  │    │  • Exit node selector  │    ┌─────────────────────┐
+└─────────────────┘  │    │  • LAN access control  │───▶│  LAN Resources      │
+                     │    │  • Health monitoring   │    │  192.168.1.0/24     │
+┌─────────────────┐  │    │                        │    │  10.0.0.0/8         │
+│  Remote Site    │──┘    └─────────────────────┬──┘    └─────────────────────┘
+│  (Branch Office)│                             │
+└─────────────────┘                             │    ┌─────────────────────┐
+                                                └───▶│  Exit Node Peer 2   │───▶ Internet
+                                                     │  (Home/VPS/CGNAT)   │     (via Peer 2 IP)
+                                                     └─────────────────────┘
+```
+
+**Traffic Flow:**
+- iPhone → Gateway → Exit Peer 1 → Internet *(appears as Peer 1's IP)*
+- LAN Devices → Gateway → Exit Peer 1 → Internet *(appears as Peer 1's IP)*
+- Switch between Exit Peer 1 ↔ Exit Peer 2 on-the-fly from the dashboard
+
+---
+
+## 📸 Screenshots
+
+![Dashboard Light](docs/figures/dashboard-light.png)
+![Dashboard Dark](docs/figures/dashboard-dark.png)
+
+---
+
+## ✨ Features
+
+### Core WireGuard Management
+- **Multi-peer support** — Manage peers from one interface
+- **Interactive network graph** — Visual P2P network topology
+- **QR codes & .conf export** — Easy peer provisioning
+- **HTTPS & JWT auth** — Secure web access with password login
+
+### Router Mode (This Fork)
+- **Web init mode** — Launch the binary and configure from the Web
+- **Exit node selection** — Route all peer traffic through a selected peer dynamically
+- **Per-peer routing tables** — Each peer gets an isolated routing table (avoids conflicts)
+- **Overlapping route support** — Multiple 0.0.0.0/0 routes coexist in separate tables
+- **Per-peer LAN access** — Toggle home icon to allow/deny LAN access
+- **Persistent settings** — LAN access and exit node selection survive restarts
+- **Pause and Restart peers** — Pause peer temporarily or reconnect them from GUI
+
+### Monitoring & Dashboard
+- **Real-time health metrics** — Latency, packet loss, jitter
+- **Traffic graphs** — Enhanced with tooltips and grid lines
+- **Three-card layout:**
+  - System Health & Info (status, tunnel IP, LAN subnets)
+  - Control Center (toggles, connected peers with controls)
+  - Gateway Status (exit node health, uptime, endpoint)
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+```bash
+# Install dependencies
+sudo apt install wireguard-tools iptables
+```
+
+### Manual Installation
+
+**Step 1: Download the binary**
+```bash
+# Download latest release
+curl -L -o wg-quickrs https://github.com/grizzy255/wg-quickrs-router/releases/latest/download/wg-quickrs-linux-amd64
+
+# Move to system path and make executable
+sudo mv wg-quickrs /usr/local/bin/
+sudo chmod +x /usr/local/bin/wg-quickrs
+
+# Verify installation
+wg-quickrs --version
+```
+
+**Step 2: Create systemd service**
+```bash
+sudo tee /etc/systemd/system/wg-quickrs.service > /dev/null << 'EOF'
+[Unit]
+Description=wg-quickrs WireGuard Gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/wg-quickrs agent run --config /etc/wireguard/wg-quickrs.yaml
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+**Step 3: Enable and start the service**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable wg-quickrs
+sudo systemctl start wg-quickrs
+
+# Check status
+sudo systemctl status wg-quickrs
+
+# View logs
+sudo journalctl -u wg-quickrs -f
+```
+
+**Step 4: Access the Web UI**
+
+Web UI accessible at `http://<your-ip>:80`
+
+---
+
+## 📁 Configuration
+
+- **Config file:** `/etc/wireguard/wg-quickrs.yaml`
+- **Router Mode state:** `/etc/wireguard/router_mode_state.json`
+
+---
+
+## 📄 License
+
+GPL-3.0 — See [LICENSE.txt](LICENSE.txt)
+
+---
+
+<sub>"WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.</sub>
