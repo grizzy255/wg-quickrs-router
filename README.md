@@ -23,16 +23,16 @@
 
 ## 🎯 Problem Statement
 
-We faced an infrastructure challenge where remote peers were behind **CGNAT** (Carrier-Grade NAT) or cellular networks (LTE/Starlink), making them unreachable from the outside.
+I wanted to use remote sites as exit nodes for internet traffic, but those sites were stuck behind **CGNAT** (cellular/ISP firewalls). This meant I couldn't just "dial in" to them.
 
-### Why Standard Solutions Failed
+### Technical Implications (UniFi Context)
 
-| Approach | Problem |
-|----------|---------|
-| **Client Mode** | Gateway can't dial peers — they have no public IP |
-| **Server Mode (UniFi, etc.)** | Peers can connect, but no granular Policy-Based Routing to control where traffic goes |
+| Mode | Limitation |
+|------|------------|
+| **Client Mode VPN** | Not possible for PBR on LAN hosts — remote site has no public IP to accept connections |
+| **Server Mode VPN** | Peers can connect, but UniFi lacks granular PBR to control traffic flow per peer |
 
-**We needed:** A solution that accepts incoming connections from hidden peers while providing advanced routing logic.
+**The Goal:** A solution that acts as a rendezvous point for NAT-restricted peers while providing the advanced routing logic required to manage traffic flow.
 
 ---
 
@@ -49,34 +49,33 @@ Deploy on a Linux host with a public IP (or port forwarding) to:
 5. **Access Control** — Allow or deny LAN access per peer
 
 ```
-                                                    ┌─────────────────────┐
-                                               ┌───▶│  Exit Node Peer 1   │───▶ Internet
-                                               │    │  (Home/Office)      │     (via Peer 1 IP)
-                                               │    └─────────────────────┘
-┌─────────────────┐                            │
-│  iPhone         │──┐                         │
-│  (CGNAT/LTE)    │  │    ┌────────────────────┴───┐
+                                                     ┌─────────────────────┐
+                                                ┌───▶│  Exit Node Peer 1   │───▶ Internet
+                                                │    │  (Remote Site/CGNAT)│     (via Peer 1 IP)
+                                                │    └─────────────────────┘
+┌─────────────────┐                             │
+│  iPhone         │──┐                          │
+│  (CGNAT/LTE)    │  │    ┌─────────────────────┴──┐
 └─────────────────┘  │    │                        │
                      ├───▶│   wg-quickrs Gateway   │
 ┌─────────────────┐  │    │                        │
-│  Laptop         │──┤    │  • Per-peer route table│
-│  (Starlink)     │  │    │  • Exit node selector  │    ┌─────────────────────┐
+│  LAN Devices    │──┤    │  • Per-peer route table│
+│                 │  │    │  • Exit node selector  │    ┌─────────────────────┐
 └─────────────────┘  │    │  • LAN access control  │───▶│  LAN Resources      │
                      │    │  • Health monitoring   │    │  192.168.1.0/24     │
 ┌─────────────────┐  │    │                        │    │  10.0.0.0/8         │
-│  Remote Site    │──┘    └────────────────────┬───┘    └─────────────────────┘
-│  (Branch Office)│                            │
-└─────────────────┘                            │    ┌─────────────────────┐
-                                               └───▶│  Exit Node Peer 2   │───▶ Internet
-                                                    │  (Datacenter/VPS)   │     (via Peer 2 IP)
-                                                    └─────────────────────┘
-
-Traffic Flow Examples:
-  • iPhone → Gateway → Exit Peer 1 → Internet (appears as Peer 1's IP)
-  • Laptop → Gateway → Exit Peer 2 → Internet (appears as Peer 2's IP)
-  • Remote Site → Gateway → LAN Resources (if LAN access enabled)
-  • Any peer can be dynamically selected as exit node from the dashboard
+│  Remote Site    │──┘    └─────────────────────┬──┘    └─────────────────────┘
+│  (Branch Office)│                             │
+└─────────────────┘                             │    ┌─────────────────────┐
+                                                └───▶│  Exit Node Peer 2   │───▶ Internet
+                                                     │  (Datacenter/VPS)   │     (via Peer 2 IP)
+                                                     └─────────────────────┘
 ```
+
+**Traffic Flow:**
+- iPhone → Gateway → Exit Peer 1 → Internet *(appears as Peer 1's IP)*
+- LAN Devices → Gateway → Exit Peer 1 → Internet *(appears as Peer 1's IP)*
+- Switch between Exit Peer 1 ↔ Exit Peer 2 on-the-fly from the dashboard
 
 ---
 
