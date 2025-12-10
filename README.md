@@ -37,13 +37,13 @@ flowchart TD
         Gateway["wg-quickrs Gateway"]
     end
 
-    subgraph Internet ["🏠 Your Devices"]
+    subgraph Local Internet ["🏠 Your Devices"]
         iPhone["iPhone / PC"]
         Gateway["wg-quickrs Gateway"]
     end
 
     subgraph Internet ["☁️ Internet"]
-        Remote1["Exit Node Peer 1 (Remote Site / CGNAT)"]
+        Remote1["Exit Node Peer 1 (CGNAT)"]
         Remote2["Exit Node Peer 2 (Home / VPS)"]
     end
 
