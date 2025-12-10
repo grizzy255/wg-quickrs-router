@@ -52,8 +52,8 @@ flowchart LR
     ATV -->|Policy Route| Gateway
     iPhone -->|WireGuard| Gateway
     
-    Gateway <--|Tunnel| Remote1
-    Gateway <--|Tunnel| Remote2
+    Gateway <-->|Tunnel| Remote1
+    Gateway <-->|Tunnel| Remote2
     
     Remote1 -.-> World
     Remote2 -.-> World
