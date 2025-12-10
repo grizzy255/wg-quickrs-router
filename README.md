@@ -33,29 +33,26 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 ```mermaid
 flowchart TD
     subgraph LAN ["🏠 Your Local Network"]
-        iPhone[iPhone / PC]
-        ATV[Apple TV]
-        Gateway[<b>wg-quickrs Gateway</b><br/>(This Tool)]
+        iPhone["iPhone / PC"]
+        ATV["Apple TV"]
+        Gateway["wg-quickrs Gateway"]
     end
 
     subgraph Internet ["☁️ Internet"]
-        Remote1[<b>Exit Node Peer 1</b><br/>(Remote Site / CGNAT)]
-        Remote2[<b>Exit Node Peer 2</b><br/>(Home / VPS)]
+        Remote1["Exit Node Peer 1\n(Remote Site / CGNAT)"]
+        Remote2["Exit Node Peer 2\n(Home / VPS)"]
     end
 
-    %% Connections
     iPhone -->|Default Route| Gateway
     ATV -->|Policy Route| Gateway
     
-    Gateway <==>|WireGuard Tunnel| Remote1
-    Gateway <==>|WireGuard Tunnel| Remote2
+    Gateway <-->|WireGuard Tunnel| Remote1
+    Gateway <-->|WireGuard Tunnel| Remote2
     
-    Remote1 -.->|Public IP A| World[World Wide Web]
+    Remote1 -.->|Public IP A| World["World Wide Web"]
     Remote2 -.->|Public IP B| World
 
-    %% Styling
-    classDef box fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    class Gateway box
+    style Gateway fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 **Traffic Flow Example:**
