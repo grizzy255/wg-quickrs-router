@@ -31,39 +31,37 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 **wg-quickrs Gateway** acts as a central "Rendezvous Point." Remote peers connect *out* to the gateway, and the gateway intelligently routes LAN traffic back through them.
 
 ```mermaid
-flowchart TD
-    subgraph LAN ["🏠 Your Local Network"]
-        direction TB
-        ATV["Apple TV"]
-        
-        %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
+flowchart LR
+    subgraph LAN ["🏠 Local Network"]
+        ATV["📺 Apple TV"]
     end
 
-    subgraph Local Internet ["Roaming Devices"]
-        direction TB
-        iPhone["iPhone / Laptop"]
-    
-        %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
-    end
-    subgraph Internet ["☁️ Remote Internet"]
-        Remote1["Exit Node Peer 1<br/>(CGNAT)"]
-        Remote2["Exit Node Peer 2<br/>(Home / VPS)"]
+    subgraph Roaming ["📱 Roaming Devices"]
+        iPhone["📱 iPhone / Laptop"]
     end
 
-    %% Connections
-    iPhone -->|Default WG Route| Gateway
-    ATV -->|Default Gateway | Gateway
-    
-    Gateway <--|WireGuard Tunnel| Remote1
-    Gateway <==>|WireGuard Tunnel| Remote2
-    
-    Remote1 -.->|Public IP A| World["Remote Internet Breakout"]
-    Remote2 -.->|Public IP B| World
+    subgraph GW ["⚡ wg-quickrs Gateway"]
+        Gateway["Router Mode\n+ Exit Node Selection\n+ Health Monitoring\n+ Per-Peer Routing Tables"]
+    end
 
-    %% Styling
+    subgraph Remote ["☁️ Exit Nodes"]
+        Remote1["Peer 1\nCGNAT Site"]
+        Remote2["Peer 2\nHome / VPS"]
+    end
+
+    World["🌐 Internet"]
+
+    ATV -->|Policy Route| Gateway
+    iPhone -->|WireGuard| Gateway
+    
+    Gateway <-->|Tunnel| Remote1
+    Gateway <-->|Tunnel| Remote2
+    
+    Remote1 -.-> World
+    Remote2 -.-> World
+
     style Gateway fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style GW fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px
 ```
 
 **Traffic Flow Example:**
