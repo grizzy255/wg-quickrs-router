@@ -82,8 +82,8 @@ flowchart LR
     iPhone --> GW
     
     %% Encrypted Tunnels
-    GW -- "WireGuard Tunnel" --> Peer1
-    GW -- "WireGuard Tunnel" --> Peer2
+    GW -- "WireGuard Tunnel" <-- Peer1
+    GW -- "WireGuard Tunnel" <-- Peer2
     
     %% Internet Access
     Peer1 -. "NAT Egress" .-> World
