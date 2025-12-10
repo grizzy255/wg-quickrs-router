@@ -32,36 +32,68 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 
 ```mermaid
 flowchart LR
-    subgraph LAN ["🏠 Local Network"]
-        ATV["📺 Apple TV"]
+    %% --- Styling Definitions ---
+    classDef base font-family:sans-serif,font-size:14px
+    
+    %% Client Nodes (Blue Theme)
+    classDef client fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b,rx:10,ry:10
+    
+    %% Gateway Node (Teal/Green Theme - Central Hub)
+    classDef gateway fill:#e0f2f1,stroke:#00897b,stroke-width:3px,color:#004d40,rx:10,ry:10,shadow:5px
+    
+    %% Exit Nodes (Orange Theme - External)
+    classDef exit fill:#fff3e0,stroke:#f57c00,stroke-width:2px,stroke-dasharray: 5 5,color:#e65100,rx:5,ry:5
+    
+    %% Internet (Purple Theme)
+    classDef internet fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
+    
+    %% Subgraph Styling
+    classDef subgraphStyle fill:#ffffff,stroke:#cfd8dc,stroke-width:1px,color:#546e7a,rx:5,ry:5
+
+    %% --- Graph Content ---
+    
+    subgraph Local ["🏠 Local Network"]
+        direction TB
+        ATV["📺 Apple TV"]:::client
     end
 
     subgraph Roaming ["📱 Roaming Devices"]
-        iPhone["📱 iPhone / Laptop"]
+        direction TB
+        iPhone["📱 iPhone / Laptop"]:::client
     end
 
-    subgraph GW ["⚡ wg-quickrs Gateway"]
-        Gateway["Router Mode\n+ Exit Node Selection\n+ Health Monitoring\n+ Per-Peer Routing Tables"]
+    subgraph GW_Zone ["⚡ Gateway Infrastructure"]
+        direction TB
+        GW["<b>Main Gateway</b><br/>Router Mode<br/>Health Checks<br/>Routing Logic"]:::gateway
     end
 
-    subgraph Remote ["☁️ Exit Nodes"]
-        Remote1["Peer 1\nCGNAT Site"]
-        Remote2["Peer 2\nHome / VPS"]
+    subgraph Exits ["☁️ Remote Exit Nodes"]
+        direction LR
+        Peer1["Peer 1<br/>(CGNAT Site)"]:::exit
+        Peer2["Peer 2<br/>(Home / VPS)"]:::exit
     end
 
-    World["🌐 Internet"]
+    World(("🌐 Internet")):::internet
 
-    ATV -->|Policy Route| Gateway
-    iPhone -->|WireGuard| Gateway
+    %% --- Connections ---
     
-    Gateway <-->|Tunnel| Remote1
-    Gateway <-->|Tunnel| Remote2
+    %% Client Traffic
+    ATV --> GW
+    iPhone --> GW
     
-    Remote1 -.-> World
-    Remote2 -.-> World
+    %% Encrypted Tunnels
+    GW -- "WireGuard Tunnel" --> Peer1
+    GW -- "WireGuard Tunnel" --> Peer2
+    
+    %% Internet Access
+    Peer1 -. "NAT Egress" .-> World
+    Peer2 -. "NAT Egress" .-> World
 
-    style Gateway fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
-    style GW fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px
+    %% Apply Styles
+    class Local,Roaming,GW_Zone,Exits subgraphStyle
+    
+    %% Link Styling for smoother look
+    linkStyle default stroke:#546e7a,stroke-width:2px,fill:none
 ```
 
 **Traffic Flow Example:**
