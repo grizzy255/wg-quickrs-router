@@ -37,7 +37,7 @@ flowchart TD
         ATV["Apple TV"]
         
         %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring"]
+        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
     end
 
     subgraph Local Internet ["🏠 Roaming Devices"]
@@ -45,7 +45,7 @@ flowchart TD
         iPhone["iPhone / PC"]
     
         %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring"]
+        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
     end
     subgraph Internet ["☁️ Internet"]
         Remote1["Exit Node Peer 1<br/>(CGNAT)"]
