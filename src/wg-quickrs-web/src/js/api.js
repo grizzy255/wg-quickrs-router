@@ -20,7 +20,7 @@ export default class API {
         const url = `${import.meta.env.VITE_API_FETCH_URL_PREFIX}${path}${separator}${cacheBuster}`;
         
         const res = await fetch(url, {
-            method,
+            method: method.toUpperCase(),
             headers: headers,
             body: body
                 ? JSON.stringify(body)
