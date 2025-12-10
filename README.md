@@ -31,7 +31,7 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 **wg-quickrs Gateway** acts as a central "Rendezvous Point." Remote peers connect *out* to the gateway, and the gateway intelligently routes LAN traffic back through them.
 
 ```mermaid
-flowchart TD
+flowchart LR
     subgraph LAN ["🏠 Local Network"]
         ATV["📺 Apple TV"]
         Gateway["⚡ wg-quickrs Gateway ---- Exit Node Selection\n+ Health Monitoring\n+ Per-Peer 
@@ -52,8 +52,8 @@ flowchart TD
     ATV -->|Default Route| Gateway
     iPhone -->|WG Default Route| Gateway
     
-    Remote1 -->|WG Tunnel| Gateway
-    Remote2 -->|WG Tunnel| Gateway
+    Gateway <-->|WG Tunnel| Remote1
+    Gateway <-->|WG Tunnel| Remote2
     
     Remote1 -.-> World
     Remote2 -.-> World
