@@ -47,7 +47,7 @@ flowchart TD
         %% Use <br/> to break lines manually
         Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
     end
-    subgraph Internet ["☁️ Internet"]
+    subgraph Internet ["☁️ Remote Internet"]
         Remote1["Exit Node Peer 1<br/>(CGNAT)"]
         Remote2["Exit Node Peer 2<br/>(Home / VPS)"]
     end
