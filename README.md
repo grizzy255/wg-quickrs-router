@@ -21,7 +21,10 @@
 
 ## 💡 The Challenge
 
-Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-to-Site scenarios involving **CGNAT** (Carrier-Grade NAT).
+Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-to-Site scenarios involving **CGNAT** (Carrier-Grade NAT) and Policy based Routing.
+
+
+In a Unifi setup 
 
 1. **Client Mode VPNs** fail because the remote site (e.g., a cellular modem) has no public IP to accept connections.
 2. **Server Mode VPNs** allow connection, but lack the granular routing logic (PBR) to decide *which* LAN traffic goes to *which* peer.
