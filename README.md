@@ -42,7 +42,7 @@ flowchart TD
 
     subgraph Local Internet ["🏠 Roaming Devices"]
         direction TB
-        iPhone["iPhone / PC"]
+        iPhone["iPhone / Laptop"]
     
         %% Use <br/> to break lines manually
         Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
