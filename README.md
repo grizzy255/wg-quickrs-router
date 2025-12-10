@@ -45,7 +45,7 @@ flowchart TD
         iPhone["iPhone / PC"]
     
         %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node"]
+        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring"]
     end
     subgraph Internet ["☁️ Internet"]
         Remote1["Exit Node Peer 1<br/>(CGNAT)"]
@@ -53,8 +53,8 @@ flowchart TD
     end
 
     %% Connections
-    iPhone -->|Default Route| Gateway
-    ATV -->|Policy Route| Gateway
+    iPhone -->|Default WG Route| Gateway
+    ATV -->|Default Gateway | Gateway
     
     Gateway <==>|WireGuard Tunnel| Remote1
     Gateway <==>|WireGuard Tunnel| Remote2
