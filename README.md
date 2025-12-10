@@ -57,8 +57,8 @@ flowchart LR
     Gateway <-->|WG Tunnel 0.0.0.0/0 Active| Remote1
     Gateway <-->|WG Tunnel 0.0.0.0/0 Backup| Remote2
     
-    Remote1 -.-> World
-    Remote2 -.-> World
+    Remote1 -.->|NAT| World
+    Remote2 -.->|NAT| World
 
     style Gateway fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
 ```
