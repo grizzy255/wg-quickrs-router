@@ -34,13 +34,19 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 flowchart TD
     subgraph LAN ["🏠 Your Local Network"]
         direction TB
-        iPhone["iPhone / PC"]
         ATV["Apple TV"]
         
         %% Use <br/> to break lines manually
         Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node"]
     end
 
+    subgraph Local Internet ["🏠 Roaming Devices"]
+        direction TB
+        iPhone["iPhone / PC"]
+    
+        %% Use <br/> to break lines manually
+        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node"]
+    end
     subgraph Internet ["☁️ Internet"]
         Remote1["Exit Node Peer 1<br/>(CGNAT)"]
         Remote2["Exit Node Peer 2<br/>(Home / VPS)"]
