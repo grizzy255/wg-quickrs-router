@@ -63,7 +63,8 @@ flowchart LR
 
 **Traffic Flow Example:**
 - Apple TV ➔ Gateway ➔ Exit Peer 1 ➔ Internet *(Appears as Peer 1's IP)*
-- iPhone ➔ Gateway ➔ Exit Peer 2 ➔ Internet *(Appears as Peer 2's IP)*
+- Peer 1 down - Auto or Manual switchover
+- Apple TV ➔ Gateway ➔ Exit Peer 2 ➔ Internet *(Appears as Peer 2's IP)*
 
 ---
 
