@@ -34,14 +34,11 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 flowchart LR
     subgraph LAN ["🏠 Local Network"]
         ATV["📺 Apple TV"]
+        Gateway["⚡ wg-quickrs Gateway"]
     end
 
     subgraph Roaming ["📱 Roaming Devices"]
         iPhone["📱 iPhone / Laptop"]
-    end
-
-    subgraph GW ["⚡ wg-quickrs Gateway"]
-        Gateway["Router Mode\n+ Exit Node Selection\n+ Health Monitoring\n+ Per-Peer Routing Tables"]
     end
 
     subgraph Remote ["☁️ Exit Nodes"]
@@ -61,7 +58,6 @@ flowchart LR
     Remote2 -.-> World
 
     style Gateway fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
-    style GW fill:#e8f5e9,stroke:#4CAF50,stroke-width:2px
 ```
 
 **Traffic Flow Example:**
