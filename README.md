@@ -5,23 +5,22 @@
 [![Latest Release](https://img.shields.io/github/v/release/grizzy255/wg-quickrs-router?label=Latest%20Release)](https://github.com/grizzy255/wg-quickrs-router/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 
-**wg-quickrs Gateway** transforms a standard Linux host into an intelligent VPN rendezvous point. It solves the headache of connecting to peers behind cellular/ISP firewalls (CGNAT) while maintaining granular control over your LAN traffic.
+**wg-quickrs Gateway** transforms a standard Linux host into an intelligent VPN rendezvous point. It solves the headache of connecting to peers behind cellular/ISP firewalls (CGNAT) while allowing you to select traffic to exit via Exit nodes (nodes advertising defaulf routes).
 
 ---
 
 ## 🚀 Features
 
-* **⚡ Smart Gateway:** Auto-failover to healthy gateways (3s detection) and auto-failback when stability returns.
-* **🌉 CGNAT Traversal:** "Dial out" from restricted networks (LTE/Starlink) to this gateway to establish bi-directional connectivity.
-* **🎯 Policy-Based Routing (PBR):** Assign specific LAN devices (e.g., Apple TV) to specific remote exit nodes.
-* **🛡️ Per-Peer Isolation:** Each peer gets a dedicated routing table—no more route conflicts.
+* **🌉 CGNAT Traversal:** "Dial out" from restricted networks to this gateway to establish bi-directional connectivity.
+* **⚡ Multiple Exit nodes:** Installs multiple nodes advertising a default route (cannot be done in a single wiregurd domain). Each exit node gets a dedicated routing table—no more route conflicts.
+* **⚡  Exit node monitoring:** Auto-failover/ Manual to healthy exit nodes (3s detection) and auto-failback when stability returns.
 * **📊 Visual Dashboard:** Real-time health metrics (jitter/latency), topology graphs, and one-click controls.
 
 ---
 
 ## 💡 The Challenge
 
-Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-to-Site scenarios involving **CGNAT** (Carrier-Grade NAT) and Policy based Routing.
+Standard WireGuard is great, but it struggles in complex Exit Node scenarios involving **CGNAT** (Carrier-Grade NAT) and Policy based Routing.
 
 
 In a Unifi setup 
@@ -31,7 +30,7 @@ In a Unifi setup
 
 ### The Solution
 
-**wg-quickrs Gateway** acts as a central "Rendezvous Point." Remote peers connect *out* to the gateway, and the gateway intelligently routes LAN traffic back through them.
+**wg-quickrs Gateway** acts as a central "Rendezvous Point." Remote peers connect *out* to the gateway, and the gateway intelligently routes LAN / remote traffic through the identified exit nodes. Wireguard does not allow 2 default routes to be installed in a single instance - this works around by installeing them in their own route table - marking onw as active and other as backup
 
 ```mermaid
 flowchart LR
