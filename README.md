@@ -34,7 +34,8 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 flowchart LR
     subgraph LAN ["🏠 Local Network"]
         ATV["📺 Apple TV"]
-        Gateway["⚡ wg-quickrs Gateway"]
+        Gateway["⚡ wg-quickrs Gateway Exit Node Selection\n+ Health Monitoring\n+ Per-Peer 
+        Routing Tables"]
     end
 
     subgraph Roaming ["📱 Roaming Devices"]
@@ -51,8 +52,8 @@ flowchart LR
     ATV -->|Policy Route| Gateway
     iPhone -->|WireGuard| Gateway
     
-    Gateway <-->|Tunnel| Remote1
-    Gateway <-->|Tunnel| Remote2
+    Gateway <--|Tunnel| Remote1
+    Gateway <--|Tunnel| Remote2
     
     Remote1 -.-> World
     Remote2 -.-> World
