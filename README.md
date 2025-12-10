@@ -34,12 +34,12 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 flowchart TD
     subgraph LAN ["🏠 Your Local Network"]
         ATV["Apple TV"]
-        Gateway["wg-quickrs Gateway"]
+        Gateway["wg-quickrs Gateway - Policy based Routing, Active Backup exit node selection"]
     end
 
     subgraph Local Internet ["🏠 Your Devices"]
         iPhone["iPhone / PC"]
-        Gateway["wg-quickrs Gateway"]
+        Gateway["wg-quickrs Gateway - Policy based Routing, Active Backup exit node selection"]
     end
 
     subgraph Internet ["☁️ Internet"]
