@@ -77,9 +77,12 @@
               :has-lan-access="hasLanAccess"
               :lan-access-loading="lanAccessLoading"
               :peer-control-loading="peerControlLoading"
+              :auto-failover="autoFailover"
+              :auto-failover-loading="autoFailoverLoading"
               @toggle-wireguard="dialogId = 'network-toggle'"
               @toggle-router-mode="handleRouterModeToggle"
               @toggle-lan-access="toggleLanAccess"
+              @toggle-auto-failover="dialogId = 'smart-gateway-toggle'"
               @peer-control="handlePeerControl">
           </control-center-card>
 
@@ -212,6 +215,45 @@
       </div>
     </custom-dialog>
 
+    <!-- Dialog: Smart Gateway Toggle -->
+    <custom-dialog v-if="dialogId === 'smart-gateway-toggle'"
+                   :left-button-click="() => { dialogId = '' }"
+                   modal-classes="max-w-xl"
+                   :left-button-text="'Cancel'"
+                   :right-button-color="autoFailover ? 'red' : 'green'"
+                   :right-button-click="() => { toggleAutoFailover(); dialogId = ''; }"
+                   :right-button-text="autoFailover ? 'Disable' : 'Enable'"
+                   class="z-10"
+                   :icon="autoFailover ? 'danger' : 'info'">
+      <h3 class="text-lg leading-6 font-medium text-primary">
+        {{ autoFailover ? 'Disable' : 'Enable' }} Smart Gateway
+      </h3>
+      <div class="mt-2 text-sm text-secondary">
+        <div v-if="!autoFailover">
+          <p class="mb-3">Smart Gateway provides automatic gateway failover and failback:</p>
+          <div class="space-y-2 ml-2">
+            <div class="flex items-start gap-2">
+              <span class="text-green-500 font-bold">→</span>
+              <div>
+                <span class="font-medium">Auto-Failover:</span> 
+                If your current gateway fails (3 consecutive ping failures), traffic automatically switches to the next healthy gateway.
+              </div>
+            </div>
+            <div class="flex items-start gap-2">
+              <span class="text-blue-500 font-bold">←</span>
+              <div>
+                <span class="font-medium">Auto-Failback:</span> 
+                When your preferred gateway recovers and stays online for 60 seconds, traffic automatically switches back.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else>
+          <p>Disabling Smart Gateway will stop automatic gateway switching. You will need to manually select a gateway if the current one fails.</p>
+        </div>
+      </div>
+    </custom-dialog>
+
   </div>
 </template>
 
@@ -290,7 +332,9 @@ export default {
       isDarkMode: false,     // Dark mode state
       peerLanAccess: {},     // Track LAN access per peer: { peerId: boolean }
       lanAccessLoading: {},  // Track LAN access toggle loading: { peerId: boolean }
-      peerControlLoading: {} // Track peer control loading: { peerId: 'reconnect'|'stop'|'start' }
+      peerControlLoading: {}, // Track peer control loading: { peerId: 'reconnect'|'stop'|'start' }
+      autoFailover: false,   // Smart Gateway - auto failover enabled
+      autoFailoverLoading: false // Smart Gateway toggle loading state
     }
   },
   async mounted() {
@@ -523,12 +567,34 @@ export default {
         this.routerMode = modeData.mode || 'host';
         this.routerModeLanCidr = modeData.lan_cidr || null;
         
-        // Fetch LAN access status when in router mode
+        // Fetch LAN access status and auto-failover when in router mode
         if (this.routerMode === 'router') {
           this.fetchLanAccessStatus();
+          this.fetchAutoFailover();
         }
       } catch {
         this.routerMode = 'unknown';
+      }
+    },
+    async fetchAutoFailover() {
+      try {
+        const result = await this.api.get_auto_failover();
+        this.autoFailover = result?.enabled || false;
+      } catch (error) {
+        console.error('Failed to load auto-failover status:', error);
+        this.autoFailover = false;
+      }
+    },
+    async toggleAutoFailover() {
+      this.autoFailoverLoading = true;
+      try {
+        const newState = !this.autoFailover;
+        await this.api.set_auto_failover({ enabled: newState });
+        this.autoFailover = newState;
+      } catch (error) {
+        console.error('Failed to toggle auto-failover:', error);
+      } finally {
+        this.autoFailoverLoading = false;
       }
     },
     async fetchLanAccessStatus() {

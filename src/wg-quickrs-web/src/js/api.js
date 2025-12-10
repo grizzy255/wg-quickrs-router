@@ -192,6 +192,21 @@ export default class API {
         });
     }
 
+    async get_auto_failover() {
+        return this.call({
+            method: 'get',
+            path: '/api/router-mode/auto-failover',
+        });
+    }
+
+    async set_auto_failover(data) {
+        return this.call({
+            method: 'post',
+            path: '/api/router-mode/auto-failover',
+            body: data
+        });
+    }
+
     async restore_routing_table() {
         return this.call({
             method: 'post',

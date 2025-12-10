@@ -225,12 +225,13 @@ export default {
       }
     },
     async updateHealthStatus() {
-      // Only update health status, don't reload full exit node info
-      // This prevents dropdown re-rendering and other UI disruption
+      // Update health status and check for exit node changes (Smart Gateway failover/failback)
       if (!this.network) return;
       
       try {
         const info = await this.api.get_exit_node_info();
+        
+        // Update health status
         if (info.health_status && Array.isArray(info.health_status)) {
           const healthMap = {};
           info.health_status.forEach(h => {
@@ -241,6 +242,13 @@ export default {
           if (healthChanged) {
             this.healthStatus = healthMap;
           }
+        }
+        
+        // Update exit node if changed (Smart Gateway failover/failback)
+        const newExitNode = info.exit_node || null;
+        if (newExitNode !== this.exitNode) {
+          this.exitNode = newExitNode;
+          this.selectedExitNode = newExitNode;
         }
       } catch (error) {
         console.error('Failed to update health status:', error);

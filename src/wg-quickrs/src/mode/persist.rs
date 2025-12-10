@@ -41,6 +41,10 @@ pub struct ModeState {
     pub peer_last_successful_ping: HashMap<String, u64>, // peer_id -> last_successful_ping_timestamp (Unix seconds)
     #[serde(default = "default_peer_lan_access")]
     pub peer_lan_access: HashMap<String, bool>, // peer_id -> has_lan_access (default true)
+    #[serde(default)]
+    pub auto_failover: bool, // Smart Gateway - automatically switch to healthy peer when exit node goes offline
+    #[serde(default)]
+    pub primary_exit_node: Option<String>, // User's preferred gateway - for fail-back after failover
 }
 
 fn default_peer_lan_access() -> HashMap<String, bool> {

@@ -40,6 +40,7 @@ static EXIT_NODE_HEALTH_CACHE: Lazy<Arc<RwLock<HashMap<Uuid, ExitNodeHealth>>>> 
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 // Health monitoring interval (ping every 1 second, like OPNsense dpinger)
+// Peer is marked offline after CONSECUTIVE_FAILURES_THRESHOLD (3) consecutive failed pings
 const HEALTH_MONITOR_INTERVAL_SECS: u64 = 1;
 
 // Track ping history for loss and jitter calculation (60 samples = 60 seconds like OPNsense)
@@ -61,6 +62,22 @@ static PING_HISTORY: Lazy<Arc<RwLock<HashMap<Uuid, VecDeque<PingResult>>>>> =
 // Tracks when peer came online in current session (after restart or offline→online transition)
 static SESSION_UP_SINCE: Lazy<Arc<RwLock<HashMap<Uuid, u64>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+// Consecutive ping failures per peer (for offline detection)
+// Peer is marked offline only after CONSECUTIVE_FAILURES_THRESHOLD failures
+static CONSECUTIVE_FAILURES: Lazy<Arc<RwLock<HashMap<Uuid, u32>>>> = 
+    Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
+
+// Number of consecutive ping failures required to mark peer as offline
+const CONSECUTIVE_FAILURES_THRESHOLD: u32 = 3;
+
+// Fail-back delay: seconds the primary must be online before switching back
+const FAILBACK_STABILITY_SECS: u64 = 60;
+
+// Track when primary exit node came back online (for fail-back timing)
+// Key: peer_id, Value: timestamp when peer came back online
+static PRIMARY_ONLINE_SINCE: Lazy<Arc<RwLock<Option<(Uuid, u64)>>>> = 
+    Lazy::new(|| Arc::new(RwLock::new(None)));
 
 // Calculate packet loss and jitter from ping history (like OPNsense dpinger)
 fn calculate_loss_and_jitter(history: &VecDeque<PingResult>) -> (Option<f64>, Option<u64>) {
@@ -1071,6 +1088,76 @@ pub fn get_exit_node() -> Result<Option<Uuid>, PolicyRoutingError> {
     Ok(None)
 }
 
+// Get Smart Gateway (auto-failover) status
+pub fn get_auto_failover() -> Result<bool, PolicyRoutingError> {
+    let state = match load_mode_state()
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))?
+    {
+        Some(s) => s,
+        None => return Ok(false), // Default to disabled
+    };
+    
+    Ok(state.auto_failover)
+}
+
+// Set Smart Gateway (auto-failover) status
+pub fn set_auto_failover(enabled: bool) -> Result<(), PolicyRoutingError> {
+    let mut state = match load_mode_state()
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))?
+    {
+        Some(s) => s,
+        None => return Err(PolicyRoutingError::PersistenceError("No mode state found - enable Router Mode first".to_string())),
+    };
+    
+    state.auto_failover = enabled;
+    
+    save_mode_state(&state)
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to save mode state: {}", e)))?;
+    
+    log::info!("Smart Gateway (auto-failover) set to: {}", enabled);
+    Ok(())
+}
+
+// Get primary exit node (user's preferred gateway for fail-back)
+pub fn get_primary_exit_node() -> Result<Option<Uuid>, PolicyRoutingError> {
+    let state = match load_mode_state()
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))?
+    {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+    
+    if let Some(primary_str) = state.primary_exit_node {
+        if let Ok(peer_id) = Uuid::parse_str(&primary_str) {
+            return Ok(Some(peer_id));
+        }
+    }
+    
+    Ok(None)
+}
+
+// Set primary exit node (user's preferred gateway for fail-back)
+pub fn set_primary_exit_node(peer_id: Option<Uuid>) -> Result<(), PolicyRoutingError> {
+    let mut state = match load_mode_state()
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))?
+    {
+        Some(s) => s,
+        None => return Err(PolicyRoutingError::PersistenceError("No mode state found - enable Router Mode first".to_string())),
+    };
+    
+    state.primary_exit_node = peer_id.map(|id| id.to_string());
+    
+    save_mode_state(&state)
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to save mode state: {}", e)))?;
+    
+    if let Some(id) = peer_id {
+        log::debug!("Smart Gateway: Set primary exit node to {}", id);
+    } else {
+        log::debug!("Smart Gateway: Cleared primary exit node");
+    }
+    Ok(())
+}
+
 // Get all peers that advertise default route
 // Optimized: Cache routes per peer to avoid redundant computation
 pub fn get_peers_with_default_route(network: &Network) -> Vec<Uuid> {
@@ -1188,6 +1275,24 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                                 "Peer {} ({}) status changed: Offline → Online ({}{})",
                                                 peer_name, peer_id_short, handshake_info, latency_info
                                             );
+                                            
+                                            // Smart Gateway fail-back: Track when primary comes back online
+                                            if let Ok(true) = get_auto_failover() {
+                                                if let Ok(Some(primary_id)) = get_primary_exit_node() {
+                                                    if primary_id == peer_id_clone {
+                                                        let now = std::time::SystemTime::now()
+                                                            .duration_since(std::time::UNIX_EPOCH)
+                                                            .map(|d| d.as_secs())
+                                                            .unwrap_or(0);
+                                                        let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
+                                                        *tracker = Some((peer_id_clone, now));
+                                                        log::info!(
+                                                            "Smart Gateway: Primary {} came back online, will fail-back in {}s if stable",
+                                                            peer_name, FAILBACK_STABILITY_SECS
+                                                        );
+                                                    }
+                                                }
+                                            }
                                         } else {
                                             // Online → Offline
                                             let handshake_info = old.last_handshake
@@ -1207,12 +1312,117 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                                 "Peer {} ({}) status changed: Online → Offline ({}{})",
                                                 peer_name, peer_id_short, handshake_info, loss_info
                                             );
+                                            
+                                            // Smart Gateway: Check if this peer is the current exit node and auto-failover is enabled
+                                            if let Ok(Some(current_exit)) = get_exit_node() {
+                                                if current_exit == peer_id_clone {
+                                                    if let Ok(true) = get_auto_failover() {
+                                                        log::info!("Smart Gateway: Current exit node {} went offline, triggering failover...", peer_name);
+                                                        
+                                                        // Find best healthy alternative from cache
+                                                        let best_alternative = cache.iter()
+                                                            .filter(|(id, h)| **id != peer_id_clone && h.is_online)
+                                                            .min_by_key(|(_, h)| h.latency_ms.unwrap_or(u64::MAX))
+                                                            .map(|(id, h)| (*id, h.latency_ms));
+                                                        
+                                                        if let Some((new_exit_id, latency)) = best_alternative {
+                                                            // Load config for set_exit_node
+                                                            if let Ok(config) = crate::conf::util::get_config() {
+                                                                let new_peer_name = config.network.peers.get(&new_exit_id)
+                                                                    .map(|p| p.name.clone())
+                                                                    .unwrap_or_else(|| new_exit_id.to_string());
+                                                                
+                                                                // Save current exit as primary before switching (for fail-back)
+                                                                if let Err(e) = set_primary_exit_node(Some(peer_id_clone)) {
+                                                                    log::warn!("Smart Gateway: Failed to save primary exit node: {}", e);
+                                                                }
+                                                                
+                                                                match set_exit_node(&new_exit_id, Some(&config.network)) {
+                                                                    Ok(_) => {
+                                                                        let latency_info = latency.map(|l| format!(" ({}ms)", l)).unwrap_or_default();
+                                                                        log::info!(
+                                                                            "Smart Gateway: Switched from {} to {}{} (will fail-back after {}s)",
+                                                                            peer_name, new_peer_name, latency_info, FAILBACK_STABILITY_SECS
+                                                                        );
+                                                                    }
+                                                                    Err(e) => {
+                                                                        log::error!("Smart Gateway: Failed to switch to {}: {}", new_peer_name, e);
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            log::warn!("Smart Gateway: No healthy alternatives available for failover");
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Clear fail-back tracking if primary went offline
+                                            let mut primary_tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
+                                            if let Some((tracked_id, _)) = *primary_tracker {
+                                                if tracked_id == peer_id_clone {
+                                                    *primary_tracker = None;
+                                                    log::debug!("Smart Gateway: Primary {} went offline, resetting fail-back timer", peer_name);
+                                                }
+                                            }
                                         }
                                     }
                                 }
                                 
                                 // Update cache
-                                cache.insert(peer_id_clone, health);
+                                cache.insert(peer_id_clone, health.clone());
+                                
+                                // Smart Gateway fail-back: Check if primary has been online long enough
+                                if let Ok(true) = get_auto_failover() {
+                                    let tracker = PRIMARY_ONLINE_SINCE.read().unwrap();
+                                    if let Some((primary_id, online_since)) = *tracker {
+                                        drop(tracker); // Release lock before doing work
+                                        
+                                        // Only check if this health update is for the primary
+                                        if peer_id_clone == primary_id && health.is_online {
+                                            let now = std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .map(|d| d.as_secs())
+                                                .unwrap_or(0);
+                                            let online_duration = now.saturating_sub(online_since);
+                                            
+                                            // Check if stable for FAILBACK_STABILITY_SECS
+                                            if online_duration >= FAILBACK_STABILITY_SECS {
+                                                // Check if we're on a different exit node
+                                                if let Ok(Some(current_exit)) = get_exit_node() {
+                                                    if current_exit != primary_id {
+                                                        log::info!(
+                                                            "Smart Gateway: Primary {} has been online for {}s, triggering fail-back...",
+                                                            peer_name, online_duration
+                                                        );
+                                                        
+                                                        // Load config and switch back
+                                                        if let Ok(config) = crate::conf::util::get_config() {
+                                                            match set_exit_node(&primary_id, Some(&config.network)) {
+                                                                Ok(_) => {
+                                                                    log::info!(
+                                                                        "Smart Gateway: Switched back to primary {}",
+                                                                        peer_name
+                                                                    );
+                                                                    // Clear primary tracking - we're back on primary
+                                                                    let _ = set_primary_exit_node(None);
+                                                                    let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
+                                                                    *tracker = None;
+                                                                }
+                                                                Err(e) => {
+                                                                    log::error!(
+                                                                        "Smart Gateway: Failed to switch back to primary {}: {}",
+                                                                        peer_name, e
+                                                                    );
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             });
                         }
                     }
@@ -1321,9 +1531,29 @@ async fn check_peer_health_impl_async(
     
     // Check connectivity using ping (non-blocking async version)
     // Ping the peer's tunnel IP (peer.address) via the WireGuard interface
-    let (is_online, latency_ms) = check_peer_connectivity_async(&peer.address.to_string(), wg_interface).await;
+    let (ping_succeeded, latency_ms) = check_peer_connectivity_async(&peer.address.to_string(), wg_interface).await;
+    
+    // Apply consecutive failures threshold for offline detection
+    // Peer is only marked offline after CONSECUTIVE_FAILURES_THRESHOLD consecutive failures
+    let consecutive_failures = CONSECUTIVE_FAILURES.clone();
+    let is_online = {
+        let mut failures = consecutive_failures.write().unwrap();
+        let failure_count = failures.entry(peer_id).or_insert(0);
+        
+        if ping_succeeded {
+            // Ping succeeded - reset failure counter, peer is online
+            *failure_count = 0;
+            true
+        } else {
+            // Ping failed - increment counter
+            *failure_count = failure_count.saturating_add(1);
+            // Only mark offline after threshold consecutive failures
+            *failure_count < CONSECUTIVE_FAILURES_THRESHOLD
+        }
+    };
     
     // Track ping history for loss and jitter calculation (like OPNsense dpinger)
+    // Note: Uses ping_succeeded (actual ping result) not is_online (threshold-based status)
     let ping_history = PING_HISTORY.clone();
     let mut history = ping_history.write().unwrap();
     let peer_history = history.entry(peer_id).or_insert_with(|| VecDeque::with_capacity(PING_HISTORY_SIZE));
@@ -1331,7 +1561,7 @@ async fn check_peer_health_impl_async(
     // Add current ping result to history
     peer_history.push_back(PingResult {
         timestamp: now,
-        latency_ms,
+        latency_ms, // None if ping_succeeded is false
     });
     
     // Keep only last 60 results (60 second window, like OPNsense)

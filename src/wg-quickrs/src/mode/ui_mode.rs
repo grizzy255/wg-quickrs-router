@@ -618,10 +618,14 @@ pub async fn get_exit_node_info(_req: HttpRequest) -> HttpResponse {
         })
     }).collect();
     
+    // Get auto-failover status
+    let auto_failover = super::routing_pbr::get_auto_failover().unwrap_or(false);
+    
     HttpResponse::Ok().json(serde_json::json!({
         "exit_node": exit_node,
         "peers_with_default_route": peers_with_default_str,
-        "health_status": health_json
+        "health_status": health_json,
+        "auto_failover": auto_failover
     }))
 }
 
@@ -762,4 +766,75 @@ pub async fn get_peer_lan_access_all(_req: HttpRequest) -> HttpResponse {
     }
 }
 
+/// Get Smart Gateway (auto-failover) status
+pub async fn get_auto_failover(_req: HttpRequest) -> HttpResponse {
+    use crate::mode::routing_pbr;
+    
+    match routing_pbr::get_auto_failover() {
+        Ok(enabled) => {
+            HttpResponse::Ok().json(serde_json::json!({
+                "enabled": enabled
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to get auto-failover status: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to get auto-failover status: {}", e)
+            }))
+        }
+    }
+}
+
+/// Set Smart Gateway (auto-failover) status
+pub async fn set_auto_failover(_req: HttpRequest, body: actix_web::web::Bytes) -> HttpResponse {
+    use crate::mode::routing_pbr;
+    
+    #[derive(serde::Deserialize)]
+    struct AutoFailoverRequest {
+        enabled: bool,
+    }
+    
+    let request: AutoFailoverRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": format!("Invalid request body: {}", e)
+            }));
+        }
+    };
+    
+    // Get current config to check mode
+    let config = match conf::util::get_config() {
+        Ok(c) => c,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to load config: {}", e)
+            }));
+        }
+    };
+    
+    // Only allow in router mode
+    if config.agent.router.mode.as_str() != "router" {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Smart Gateway is only available in Router Mode"
+        }));
+    }
+    
+    match routing_pbr::set_auto_failover(request.enabled) {
+        Ok(_) => {
+            log::info!("Smart Gateway (auto-failover) {}", if request.enabled { "enabled" } else { "disabled" });
+            HttpResponse::Ok().json(serde_json::json!({
+                "success": true,
+                "enabled": request.enabled,
+                "message": format!("Smart Gateway {}", if request.enabled { "enabled" } else { "disabled" })
+            }))
+        }
+        Err(e) => {
+            log::error!("Failed to set auto-failover: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to set auto-failover: {}", e)
+            }))
+        }
+    }
+}
 

@@ -138,6 +138,22 @@ async fn get_peer_lan_access(req: HttpRequest) -> impl Responder {
     ui_mode::get_peer_lan_access_all(req).await
 }
 
+#[get("/api/router-mode/auto-failover")]
+pub async fn get_auto_failover(req: HttpRequest) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::get_auto_failover(req).await
+}
+
+#[post("/api/router-mode/auto-failover")]
+pub async fn post_auto_failover(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    if let Err(e) = enforce_auth(req.clone()) {
+        return e;
+    }
+    ui_mode::set_auto_failover(req, body).await
+}
+
 // Init endpoints (no auth required - used before config exists)
 #[get("/api/init/status")]
 async fn get_init_status(_req: HttpRequest) -> impl Responder {

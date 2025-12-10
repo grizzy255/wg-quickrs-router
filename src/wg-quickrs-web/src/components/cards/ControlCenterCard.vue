@@ -87,6 +87,46 @@
         </div>
       </div>
       
+      <!-- Smart Gateway Toggle (only visible in Router Mode) -->
+      <div v-if="routerMode === 'router'" class="flex items-center justify-between">
+        <span class="text-sm text-secondary flex items-center gap-2">
+          <Zap :size="16" class="text-icon" />
+          Smart Gateway
+        </span>
+        <div v-if="autoFailoverLoading"
+             class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-yellow-500 cursor-wait"
+             role="button"
+             tabindex="0"
+             :aria-label="'Loading...'"
+             title="Loading...">
+          <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[7px] my-[2px] bg-white animate-pulse"></div>
+        </div>
+        <div v-else-if="!autoFailover"
+             class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-gray-400 cursor-pointer hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+             role="button"
+             tabindex="0"
+             :aria-label="'Enable Smart Gateway (Auto Failover)'"
+             :aria-pressed="false"
+             title="Enable Smart Gateway"
+             @click="$emit('toggle-auto-failover')"
+             @keydown.enter="$emit('toggle-auto-failover')"
+             @keydown.space.prevent="$emit('toggle-auto-failover')">
+          <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[2px] my-[2px] bg-white"></div>
+        </div>
+        <div v-else
+             class="inline-block align-middle shadow-md rounded-full transition-all w-5.5 h-3 bg-green-500 cursor-pointer hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+             role="button"
+             tabindex="0"
+             :aria-label="'Disable Smart Gateway (Auto Failover)'"
+             :aria-pressed="true"
+             title="Disable Smart Gateway"
+             @click="$emit('toggle-auto-failover')"
+             @keydown.enter="$emit('toggle-auto-failover')"
+             @keydown.space.prevent="$emit('toggle-auto-failover')">
+          <div class="shadow-md rounded-full w-[8px] h-[8px] mx-[12px] my-[2px] bg-white"></div>
+        </div>
+      </div>
+      
       <!-- Connected Peers -->
       <div v-if="wireguardStatus === 'up' && connectedPeers.length > 0">
         <div class="text-sm text-secondary flex items-center gap-2 mb-1">
@@ -146,7 +186,7 @@
 </template>
 
 <script>
-import { Settings, Power, Users, Router, Home, RefreshCw, Square } from 'lucide-vue-next';
+import { Settings, Power, Users, Router, Home, RefreshCw, Square, Zap } from 'lucide-vue-next';
 
 export default {
   name: 'ControlCenterCard',
@@ -157,7 +197,8 @@ export default {
     Router,
     Home,
     RefreshCw,
-    Square
+    Square,
+    Zap
   },
   props: {
     wireguardStatus: {
@@ -195,9 +236,17 @@ export default {
     peerControlLoading: {
       type: Object,
       default: () => ({})
+    },
+    autoFailover: {
+      type: Boolean,
+      default: false
+    },
+    autoFailoverLoading: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ['toggle-wireguard', 'toggle-router-mode', 'toggle-lan-access', 'peer-control']
+  emits: ['toggle-wireguard', 'toggle-router-mode', 'toggle-lan-access', 'peer-control', 'toggle-auto-failover']
 }
 </script>
 

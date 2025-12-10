@@ -131,6 +131,8 @@ pub fn switch_mode(
                 peer_last_online_state: std::collections::HashMap::new(),
                 peer_last_successful_ping: std::collections::HashMap::new(),
                 peer_lan_access: std::collections::HashMap::new(),
+                auto_failover: false,
+                primary_exit_node: None,
             };
             
             if let Err(e) = save_mode_state(&state) {
