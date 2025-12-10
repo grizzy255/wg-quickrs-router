@@ -2,6 +2,18 @@
 
 > 🔀 A WireGuard management tool with Router Mode for CGNAT/cellular peers
 
+**Latest Release:** [v2.0.1-router](https://github.com/grizzy255/wg-quickrs-router/releases/tag/v2.0.1-router)
+
+## 🆕 What's New in v2.0
+
+### Smart Gateway (Auto-Failover)
+- **⚡ Auto-Failover** — Automatically switches to a healthy gateway when current one fails (after 3 consecutive ping failures, ~3 seconds)
+- **🔄 Auto-Failback** — Returns to your preferred gateway after 60 seconds of stability
+- **📊 Improved Health Monitoring** — Changed offline detection from 1 ping to 3 consecutive failures (reduces false positives)
+- **🔔 Confirmation Dialog** — Clear explanation of Smart Gateway behavior when enabling
+
+---
+
 ## 🙏 Credits
 
 - Original project: [GodOfKebab/wg-quickrs](https://github.com/GodOfKebab/wg-quickrs)
@@ -75,8 +87,7 @@ Deploy on a Linux host in your LAN with a public IP (or port forwarding) to:
 
 ## 📸 Screenshots
 
-![Dashboard Light](docs/figures/dashboard-light.png)
-![Dashboard Dark](docs/figures/dashboard-dark.png)
+![Dashboard Dark](docs/figures/dashboard-dark1.png)
 
 ---
 
@@ -91,10 +102,11 @@ Deploy on a Linux host in your LAN with a public IP (or port forwarding) to:
 ### Router Mode (This Fork)
 - **Web init mode** — Launch the binary and configure from the Web
 - **Exit node selection** — Route all peer traffic through a selected peer dynamically
+- **Smart Gateway** — Auto-failover to healthy gateway + auto-failback after 60s stability
 - **Per-peer routing tables** — Each peer gets an isolated routing table (avoids conflicts)
 - **Overlapping route support** — Multiple 0.0.0.0/0 routes coexist in separate tables
 - **Per-peer LAN access** — Toggle home icon to allow/deny LAN access
-- **Persistent settings** — LAN access and exit node selection survive restarts
+- **Persistent settings** — LAN access, exit node, and Smart Gateway settings survive restarts
 - **Pause and Restart peers** — Pause peer temporarily or reconnect them from GUI
 
 ### Monitoring & Dashboard
