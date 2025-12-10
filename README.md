@@ -54,8 +54,8 @@ flowchart LR
     ATV -->|Default Route| Gateway
     iPhone -->|WG Default Route| Gateway
     
-    Gateway <--|WG Tunnel 0.0.0.0/0 Active| Remote1
-    Gateway <--|WG Tunnel 0.0.0.0/0 Backup| Remote2
+    Gateway <-.-|WG Tunnel 0.0.0.0/0 Active| Remote1
+    Gateway <-.-|WG Tunnel 0.0.0.0/0 Backup| Remote2
     
     Remote1 -.->|NAT| World
     Remote2 -.->|NAT| World
