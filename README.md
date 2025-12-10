@@ -37,15 +37,15 @@ flowchart TD
         ATV["Apple TV"]
         
         %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
+        Gateway["<b>wg-quickrs Gateway</b><br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table/exit Node"]
     end
 
-    subgraph Local Internet ["🏠 Roaming Devices"]
+    subgraph Local Internet ["Roaming Devices"]
         direction TB
         iPhone["iPhone / Laptop"]
     
         %% Use <br/> to break lines manually
-        Gateway["<b>wg-quickrs Gateway</b><br/>Policy Based Routing<br/>Active Backup Exit Node Selection<br/> Exit node Monitoring<br/> Separate Routing Table per exit Node"]
+        Gateway["<b>wg-quickrs Gateway</b><br/>Auto Active Backup Exit Node Selection<br/> Exit Node Monitoring<br/> Separate Routing Table per exit Node"]
     end
     subgraph Internet ["☁️ Remote Internet"]
         Remote1["Exit Node Peer 1<br/>(CGNAT)"]
@@ -56,7 +56,7 @@ flowchart TD
     iPhone -->|Default WG Route| Gateway
     ATV -->|Default Gateway | Gateway
     
-    Gateway <==>|WireGuard Tunnel| Remote1
+    Gateway <--|WireGuard Tunnel| Remote1
     Gateway <==>|WireGuard Tunnel| Remote2
     
     Remote1 -.->|Public IP A| World["Remote Internet Breakout"]
