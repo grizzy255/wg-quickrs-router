@@ -34,7 +34,7 @@ Standard WireGuard is great, but it struggles in complex "Road Warrior" or Site-
 flowchart LR
     subgraph LAN ["🏠 Local Network"]
         ATV["📺 Apple TV"]
-        Gateway["⚡ wg-quickrs Gateway Exit Node Selection\n+ Health Monitoring\n+ Per-Peer 
+        Gateway["⚡ wg-quickrs Gateway ---- Exit Node Selection\n+ Health Monitoring\n+ Per-Peer 
         Routing Tables"]
     end
 
@@ -43,17 +43,17 @@ flowchart LR
     end
 
     subgraph Remote ["☁️ Exit Nodes"]
-        Remote1["Peer 1\nCGNAT Site"]
-        Remote2["Peer 2\nHome / VPS"]
+        Remote1["Peer 1 CGNAT Site"]
+        Remote2["Peer 2 CGNAT Site"]
     end
 
     World["🌐 Internet"]
 
-    ATV -->|Policy Route| Gateway
-    iPhone -->|WireGuard| Gateway
+    ATV -->|Default Route| Gateway
+    iPhone -->|WG Default Route| Gateway
     
-    Gateway <-->|Tunnel| Remote1
-    Gateway <-->|Tunnel| Remote2
+    Remote1 -->|WG Tunnel| Gateway
+    Remote2 -->|WG Tunnel| Gateway
     
     Remote1 -.-> World
     Remote2 -.-> World
