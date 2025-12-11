@@ -24,7 +24,6 @@ When Router Mode is enabled, your wg-quickrs host can:
 
 - Linux with `iptables` installed
 - IP forwarding enabled (`net.ipv4.ip_forward=1`)
-- `NET_ADMIN` capability (if running in Docker)
 
 ## Exit Node Selection
 

@@ -8,7 +8,7 @@ This document is optimized for a fresh installation of Debian 13 that you would 
 
 ## 1. Installation
 
-You can either build from scratch or use Docker.
+Build from scratch using the instructions below.
 
 Clone the repository:
 
@@ -40,10 +40,6 @@ sh run-md.sh ../docs/BUILDING.md install-zig-build
 export RUST_TARGET=aarch64-unknown-linux-musl
 sh run-md.sh ../docs/BUILDING.md run-zig-build
 sh run-md.sh ../docs/BUILDING.md create-a-distribution
-
-# Docker
-sh run-md.sh ../docs/BUILDING.md build-src-docker
-sh run-md.sh ../docs/BUILDING.md run-agent-docker
 ```
 
 ---
@@ -131,9 +127,9 @@ sudo apt-get update && sudo apt-get install -y musl-dev cmake clang llvm-dev lib
 Build the `wg-quickrs` directory.
 
 This might take some time on slower machines.
-The build process described here is simpler and slightly different from the ones in `.github/workflows/release.yml` and
-`src/Dockerfile`. This is because those are optimized for cross-architecture/platform builds.
-If the following method doesn't meet your needs, you can look into building with `Zig` as in those methods.
+The build process described here is simpler and slightly different from the one in `.github/workflows/release.yml`.
+This is because that workflow is optimized for cross-architecture/platform builds.
+If the following method doesn't meet your needs, you can look into building with `Zig` as described in the cross-compilation section.
 
 [//]: # (build-src-debian: 1.1.4 Build and Install wg-quickrs - build)
 
@@ -370,63 +366,4 @@ sudo systemctl status wg-quickrs
 # sudo journalctl -u wg-quickrs.service -n 50
 ```
 
----
-
-### 1.2 Using Docker
-
-This might take some time on slower machines.
-The build process of the Dockerfile is slightly different from the local build alternative because the Dockerfile is
-optimized to build images for other architectures.
-
----
-
-[Install Docker on Debian 13](https://docs.docker.com/engine/install/debian/#install-using-the-repository):
-
-[//]: # (build-src-docker: 1.2 - Install docker)
-
-```sh
-for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do sudo apt-get remove $pkg; done
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-```
-
-In the `docker-compose.init.yml` file:
-
-* For the `tls-cert-generator` service (see [repo](https://github.com/GodOfKebab/tls-cert-generator)), edit the TLS
-  certificate settings and enter the FQDN/Domain names for the certificates
-* For the `wg-quickrs-init` service, edit the wg-quickrs settings
-
-[//]: # (build-src-docker: 1.2 - Edit docker compose file)
-
-```sh
-cd ..
-nano docker-compose.init.yml
-```
-
-Run the services to initialize the agent.
-
-[//]: # (run-agent-docker: 1.2 - Generate certs)
-
-```sh
-cd ..
-sudo docker compose -f docker-compose.init.yml up tls-cert-generator
-sudo docker compose -f docker-compose.init.yml up wg-quickrs-init
-
-```
-
-After initialization, you can run the `wg-quickrs-agent-run` service in `docker-compose.agent.yml`.
-
-[//]: # (run-agent-docker: 1.2 - Run agent)
-
-```sh
-cd ..
-sudo docker compose -f docker-compose.agent.yml up wg-quickrs-agent-run
-```
 

@@ -5,7 +5,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/grizzy255/wg-quickrs-router?label=Latest%20Release)](https://github.com/grizzy255/wg-quickrs-router/releases)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE.txt)
 
-**wg-quickrs Gateway** transforms a standard Linux host into an intelligent VPN rendezvous point. It solves the headache of connecting to peers behind cellular/ISP firewalls (CGNAT) while allowing you to select traffic to exit via Exit nodes (nodes advertising defaulf routes).
+**wg-quickrs Gateway** transforms a standard Linux host into VPN rendezvous point. Add peers  behind cellular/ISP firewalls (CGNAT) while allowing you to select traffic to exit via Exit nodes (nodes advertising default routes).
 
 ---
 

@@ -342,7 +342,6 @@ impl TunnelManager {
                         let _ = shell_cmd(&[fw_utility, "-I", "INPUT", "-p", "udp", "-m", "udp", "--dport", &port.to_string(), "-j", "ACCEPT"]);
                         let _ = shell_cmd(&[fw_utility, "-I", "FORWARD", "-i", interface, "-j", "ACCEPT"]);
                         let _ = shell_cmd(&[fw_utility, "-I", "FORWARD", "-o", interface, "-j", "ACCEPT"]);
-                        #[cfg(not(feature = "docker"))]
                         let _ = shell_cmd(&["sysctl", "-w", "net.ipv4.ip_forward=1"]);
                     } else if utility == "pfctl" {
                         match mod_pf_conf(&config.agent.firewall.gateway, &config.network.subnet.to_string(), true) {
@@ -366,7 +365,6 @@ impl TunnelManager {
                         let _ = shell_cmd(&[fw_utility, "-D", "INPUT", "-p", "udp", "-m", "udp", "--dport", &port.to_string(), "-j", "ACCEPT"]);
                         let _ = shell_cmd(&[fw_utility, "-D", "FORWARD", "-i", interface, "-j", "ACCEPT"]);
                         let _ = shell_cmd(&[fw_utility, "-D", "FORWARD", "-o", interface, "-j", "ACCEPT"]);
-                        #[cfg(not(feature = "docker"))]
                         let _ = shell_cmd(&["sysctl", "-w", "net.ipv4.ip_forward=0"]);
                     } else if utility == "pfctl" {
                         match mod_pf_conf(&config.agent.firewall.gateway, &config.network.subnet.to_string(), false) {
@@ -375,7 +373,6 @@ impl TunnelManager {
                         };
                         let _ = shell_cmd(&[fw_utility, "-f", "/etc/pf.conf"]);
                         let _ = shell_cmd(&[fw_utility, "-d"]);
-                        #[cfg(not(feature = "docker"))]
                         let _ = shell_cmd(&["sysctl", "-w", "net.inet.ip.forwarding=0"]);
                     }
                 }
