@@ -620,6 +620,8 @@ pub fn restore_peer_routes_after_interface_up() -> Result<(), ModeError> {
             match routing_pbr::create_peer_routing_table(peer_id) {
                 Ok(id) => {
                     log::info!("Created new routing table {} for peer {}", id, peer_id);
+                    // Update local state to match what create_peer_routing_table saved
+                    state.peer_table_ids.insert(peer_id.to_string(), id);
                     id
                 },
                 Err(e) => {
