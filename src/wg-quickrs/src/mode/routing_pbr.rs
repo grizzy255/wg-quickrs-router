@@ -2013,7 +2013,7 @@ pub fn get_peer_advertised_routes(peer_id: &Uuid, network: &Network) -> Vec<Stri
     
     let mut result: Vec<String> = routes.into_iter().collect();
     result.sort();
-    log::info!("[get_peer_advertised_routes] Returning {} routes for peer {}: {:?}", result.len(), peer_id, result);
+    log::debug!("[get_peer_advertised_routes] Returning {} routes for peer {}: {:?}", result.len(), peer_id, result);
     result
 }
 

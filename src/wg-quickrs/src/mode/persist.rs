@@ -89,7 +89,7 @@ pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
     file.write_all(json.as_bytes())
         .map_err(|e| PersistenceError::IoError(e))?;
     
-    log::info!("Saved router mode state to {:?}", file_path);
+    log::debug!("Saved router mode state to {:?}", file_path);
     Ok(())
 }
 
@@ -114,7 +114,7 @@ pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
     let state: ModeState = serde_json::from_str(&contents)
         .map_err(|e| PersistenceError::DeserializationError(e.to_string()))?;
     
-    log::info!("Loaded router mode state from {:?}", file_path);
+    log::debug!("Loaded router mode state from {:?}", file_path);
     Ok(Some(state))
 }
 
