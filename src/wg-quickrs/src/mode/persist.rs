@@ -94,6 +94,7 @@ pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
 }
 
 // Load mode state from file
+// Self-healing: if file is empty or corrupted, delete it and return None
 pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
     let file_path = get_state_file_path()?;
     
@@ -110,12 +111,29 @@ pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
     file.read_to_string(&mut contents)
         .map_err(|e| PersistenceError::IoError(e))?;
     
-    // Deserialize from JSON
-    let state: ModeState = serde_json::from_str(&contents)
-        .map_err(|e| PersistenceError::DeserializationError(e.to_string()))?;
+    // Check for empty file
+    if contents.trim().is_empty() {
+        log::warn!("Router mode state file is empty. Deleting corrupted file for self-recovery.");
+        if let Err(e) = fs::remove_file(&file_path) {
+            log::warn!("Failed to delete empty state file: {}", e);
+        }
+        return Ok(None);
+    }
     
-    log::debug!("Loaded router mode state from {:?}", file_path);
-    Ok(Some(state))
+    // Deserialize from JSON - with self-healing on corruption
+    match serde_json::from_str::<ModeState>(&contents) {
+        Ok(state) => {
+            log::debug!("Loaded router mode state from {:?}", file_path);
+            Ok(Some(state))
+        }
+        Err(e) => {
+            log::warn!("Router mode state file is corrupted ({}). Deleting for self-recovery.", e);
+            if let Err(del_err) = fs::remove_file(&file_path) {
+                log::warn!("Failed to delete corrupted state file: {}", del_err);
+            }
+            Ok(None)
+        }
+    }
 }
 
 // Clear mode state (when switching to Host Mode)

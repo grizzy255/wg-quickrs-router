@@ -393,9 +393,37 @@ pub fn initialize_mode_on_startup() -> Result<(), ModeError> {
             s
         },
         None => {
-            // No persisted state - system was in Host Mode or never initialized
-            log::info!("No persisted Router Mode state found. Starting in Host Mode.");
-            return Ok(());
+            // No persisted state - check if config says "router" (self-recovery scenario)
+            // This handles: state file deleted/corrupted but config still says router mode
+            match conf::util::get_config() {
+                Ok(config) if config.agent.router.mode == "router" => {
+                    log::warn!("Config says Router Mode but state file is missing. Auto-recovering with fresh state.");
+                    let lan_cidr = config.agent.router.lan_cidr.clone()
+                        .unwrap_or_else(|| "192.168.1.0/24".to_string());
+                    let fresh_state = ModeState {
+                        last_mode: SystemMode::Router,
+                        lan_cidr: Some(lan_cidr.clone()),
+                        peer_table_ids: std::collections::HashMap::new(),
+                        prefix_active_backup: std::collections::HashMap::new(),
+                        peer_first_handshake: std::collections::HashMap::new(),
+                        peer_last_online_state: std::collections::HashMap::new(),
+                        peer_last_successful_ping: std::collections::HashMap::new(),
+                        peer_lan_access: std::collections::HashMap::new(),
+                        auto_failover: false,
+                        primary_exit_node: None,
+                    };
+                    if let Err(e) = save_mode_state(&fresh_state) {
+                        log::warn!("Failed to save recovered state: {}", e);
+                    }
+                    log::info!("Created fresh Router Mode state with LAN CIDR: {}", lan_cidr);
+                    fresh_state
+                },
+                _ => {
+                    // Config says "host" or config not available - normal Host Mode startup
+                    log::info!("No persisted Router Mode state found. Starting in Host Mode.");
+                    return Ok(());
+                }
+            }
         }
     };
     
