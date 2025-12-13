@@ -141,13 +141,20 @@ pub fn validate_and_cleanup_persisted_state(
     // Collect peer IDs from persisted state
     let persisted_peer_ids: HashSet<String> = state.peer_table_ids.keys().cloned().collect();
     
+    // If persisted state has no peer routing tables yet, that's OK - it just means
+    // Router Mode was enabled but no exit nodes were configured yet
+    if persisted_peer_ids.is_empty() {
+        log::info!("Persisted state has no peer routing tables yet. This is valid for newly enabled Router Mode.");
+        return true;
+    }
+    
     // Find matching peers (peers that exist in both persisted state and current config)
     let matching_peers: HashSet<String> = persisted_peer_ids
         .intersection(current_peer_ids)
         .cloned()
         .collect();
     
-    // If no peers match, it's a fresh start
+    // If no peers match, it's a fresh start (config was completely replaced)
     if matching_peers.is_empty() {
         log::info!("No matching peers found between persisted state and current config. This appears to be a fresh start.");
         return false;
