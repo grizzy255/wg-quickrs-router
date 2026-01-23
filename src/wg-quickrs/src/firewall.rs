@@ -162,6 +162,76 @@ pub fn enable_router_mode_firewall(lan_cidr: &str) -> Result<(), FirewallError> 
         log::info!("Added forwarding rule: {} -> {}", wg_interface, lan_interface);
     }
     
+    // Add MSS clamping rules to fix MTU issues through WireGuard tunnel
+    // This prevents "some sites don't load" issues caused by large TCP segments
+    // WireGuard MTU is typically 1420, so TCP MSS needs to be clamped to fit
+    
+    // MSS clamp for traffic going OUT to WireGuard (FORWARD chain)
+    let mss_out_check = &[
+        "iptables", "-t", "mangle", "-C", "FORWARD",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-o", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    
+    if shell_cmd(mss_out_check).is_err() {
+        let mss_out_cmd = &[
+            "iptables", "-t", "mangle", "-A", "FORWARD",
+            "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+            "-o", wg_interface,
+            "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+        ];
+        if let Err(e) = shell_cmd(mss_out_cmd) {
+            log::warn!("Failed to add MSS clamping rule (outgoing): {} (non-fatal)", e);
+        } else {
+            log::info!("Added MSS clamping rule: outgoing TCP SYN -> {} (clamp to PMTU)", wg_interface);
+        }
+    }
+    
+    // MSS clamp for traffic coming IN from WireGuard (FORWARD chain)
+    let mss_in_check = &[
+        "iptables", "-t", "mangle", "-C", "FORWARD",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-i", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    
+    if shell_cmd(mss_in_check).is_err() {
+        let mss_in_cmd = &[
+            "iptables", "-t", "mangle", "-A", "FORWARD",
+            "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+            "-i", wg_interface,
+            "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+        ];
+        if let Err(e) = shell_cmd(mss_in_cmd) {
+            log::warn!("Failed to add MSS clamping rule (incoming): {} (non-fatal)", e);
+        } else {
+            log::info!("Added MSS clamping rule: incoming TCP SYN <- {} (clamp to PMTU)", wg_interface);
+        }
+    }
+    
+    // MSS clamp in POSTROUTING for locally-originated traffic
+    let mss_post_check = &[
+        "iptables", "-t", "mangle", "-C", "POSTROUTING",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-o", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    
+    if shell_cmd(mss_post_check).is_err() {
+        let mss_post_cmd = &[
+            "iptables", "-t", "mangle", "-A", "POSTROUTING",
+            "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+            "-o", wg_interface,
+            "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+        ];
+        if let Err(e) = shell_cmd(mss_post_cmd) {
+            log::warn!("Failed to add MSS clamping rule (postrouting): {} (non-fatal)", e);
+        } else {
+            log::info!("Added MSS clamping rule: POSTROUTING TCP SYN -> {} (clamp to PMTU)", wg_interface);
+        }
+    }
+    
     log::info!("Successfully enabled Router Mode firewall rules");
     Ok(())
 }
@@ -248,6 +318,37 @@ pub fn disable_router_mode_firewall() -> Result<(), FirewallError> {
     
     if shell_cmd(del_fwd_out_cmd).is_ok() {
         log::info!("Removed forwarding rule (WG->LAN)");
+    }
+    
+    // Remove MSS clamping rules
+    let del_mss_out = &[
+        "iptables", "-t", "mangle", "-D", "FORWARD",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-o", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    if shell_cmd(del_mss_out).is_ok() {
+        log::info!("Removed MSS clamping rule (outgoing)");
+    }
+    
+    let del_mss_in = &[
+        "iptables", "-t", "mangle", "-D", "FORWARD",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-i", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    if shell_cmd(del_mss_in).is_ok() {
+        log::info!("Removed MSS clamping rule (incoming)");
+    }
+    
+    let del_mss_post = &[
+        "iptables", "-t", "mangle", "-D", "POSTROUTING",
+        "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN",
+        "-o", wg_interface,
+        "-j", "TCPMSS", "--clamp-mss-to-pmtu"
+    ];
+    if shell_cmd(del_mss_post).is_ok() {
+        log::info!("Removed MSS clamping rule (postrouting)");
     }
     
     log::info!("Successfully disabled Router Mode firewall rules");

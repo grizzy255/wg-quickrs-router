@@ -74,10 +74,62 @@ const CONSECUTIVE_FAILURES_THRESHOLD: u32 = 3;
 // Fail-back delay: seconds the primary must be online before switching back
 const FAILBACK_STABILITY_SECS: u64 = 60;
 
+// Startup grace period: seconds after startup before Smart Gateway takes failover action
+// This prevents flip-flopping during initial handshake establishment
+const STARTUP_GRACE_PERIOD_SECS: u64 = 30;
+
 // Track when primary exit node came back online (for fail-back timing)
+// This is synced with persisted state on startup and save
 // Key: peer_id, Value: timestamp when peer came back online
 static PRIMARY_ONLINE_SINCE: Lazy<Arc<RwLock<Option<(Uuid, u64)>>>> = 
     Lazy::new(|| Arc::new(RwLock::new(None)));
+
+// Track when the service started (for startup grace period)
+static SERVICE_START_TIME: Lazy<Arc<RwLock<u64>>> = Lazy::new(|| {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    Arc::new(RwLock::new(now))
+});
+
+// Check if we're still in the startup grace period
+fn is_in_startup_grace_period() -> bool {
+    let start_time = *SERVICE_START_TIME.read().unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let elapsed = now.saturating_sub(start_time);
+    elapsed < STARTUP_GRACE_PERIOD_SECS
+}
+
+// Persist the PRIMARY_ONLINE_SINCE value to state file
+fn persist_primary_online_since(peer_id: Option<Uuid>, timestamp: Option<u64>) {
+    if let Ok(Some(mut state)) = load_mode_state() {
+        state.primary_online_since = timestamp;
+        if let Err(e) = save_mode_state(&state) {
+            log::warn!("Failed to persist primary_online_since: {}", e);
+        }
+    }
+    
+    // Also update the in-memory static
+    let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
+    *tracker = peer_id.zip(timestamp);
+}
+
+// Restore PRIMARY_ONLINE_SINCE from persisted state on startup
+pub fn restore_primary_online_since_from_state() {
+    if let Ok(Some(state)) = load_mode_state() {
+        if let (Some(primary_str), Some(timestamp)) = (&state.primary_exit_node, state.primary_online_since) {
+            if let Ok(peer_id) = Uuid::parse_str(primary_str) {
+                let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
+                *tracker = Some((peer_id, timestamp));
+                log::info!("Restored fail-back timer for primary {} (online since {})", peer_id, timestamp);
+            }
+        }
+    }
+}
 
 // Calculate packet loss and jitter from ping history (like OPNsense dpinger)
 fn calculate_loss_and_jitter(history: &VecDeque<PingResult>) -> (Option<f64>, Option<u64>) {
@@ -577,17 +629,77 @@ fn set_exit_node_impl(peer_id: &Uuid, network: &Network) -> Result<(), PolicyRou
     let peer_id_str = peer_id.to_string();
     
     // Load current state ONCE at the beginning - reuse throughout the function
-    let mut state = load_mode_state()
-        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))?
-        .ok_or_else(|| PolicyRoutingError::PersistenceError("No mode state found".to_string()))?;
+    // If no state exists but config says router mode, auto-create fresh state
+    let mut state = match load_mode_state()
+        .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load mode state: {}", e)))? 
+    {
+        Some(s) => s,
+        None => {
+            // No mode state found - check if config says router mode and auto-create
+            let config = crate::conf::util::get_config()
+                .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to load config: {}", e)))?;
+            
+            if config.agent.router.mode == "router" {
+                log::warn!("No mode state found but config says Router Mode. Auto-creating mode state for exit node setup.");
+                let lan_cidr = config.agent.router.lan_cidr.clone()
+                    .unwrap_or_else(|| "192.168.1.0/24".to_string());
+                
+                let fresh_state = super::persist::ModeState {
+                    last_mode: super::mode::SystemMode::Router,
+                    lan_cidr: Some(lan_cidr),
+                    peer_table_ids: std::collections::HashMap::new(),
+                    prefix_active_backup: std::collections::HashMap::new(),
+                    peer_first_handshake: std::collections::HashMap::new(),
+                    peer_last_online_state: std::collections::HashMap::new(),
+                    peer_last_successful_ping: std::collections::HashMap::new(),
+                    peer_lan_access: std::collections::HashMap::new(),
+                    auto_failover: false,
+                    primary_exit_node: None,
+                    primary_online_since: None,
+                };
+                
+                // Save the fresh state
+                if let Err(e) = save_mode_state(&fresh_state) {
+                    log::warn!("Failed to save auto-created mode state: {}", e);
+                }
+                
+                fresh_state
+            } else {
+                return Err(PolicyRoutingError::PersistenceError(
+                    "No mode state found - enable Router Mode first".to_string()
+                ));
+            }
+        }
+    };
     
     // Get table ID for this peer - use loaded state to avoid redundant load
+    // If no table exists, auto-create one (handles case where mode state was just auto-created)
     let table_id = match state.peer_table_ids.get(&peer_id_str).copied() {
         Some(id) => id,
         None => {
-            return Err(PolicyRoutingError::TableIdError(
-                format!("No routing table found for peer {}", peer_id_str)
-            ));
+            log::info!("No routing table found for peer {}. Auto-creating one.", peer_id_str);
+            // Create routing table for this peer
+            let new_table_id = create_peer_routing_table(peer_id)?;
+            
+            // Install routes for this peer
+            let wg_interface = &network.name;
+            let routes = get_peer_advertised_routes(peer_id, network);
+            if let Err(e) = install_peer_routes(peer_id, new_table_id, &routes, wg_interface) {
+                log::warn!("Failed to install routes for peer {}: {}", peer_id_str, e);
+            }
+            
+            // Install PBR rules for this peer
+            let lan_interface = find_lan_interface().unwrap_or_else(|_| "eth0".to_string());
+            if let Err(e) = install_pbr_rules_for_peer(peer_id, new_table_id, &routes, &lan_interface) {
+                log::warn!("Failed to install PBR rules for peer {}: {}", peer_id_str, e);
+            }
+            
+            // Reload state to get the updated peer_table_ids
+            state = load_mode_state()
+                .map_err(|e| PolicyRoutingError::PersistenceError(format!("Failed to reload mode state: {}", e)))?
+                .ok_or_else(|| PolicyRoutingError::PersistenceError("Mode state disappeared after creating routing table".to_string()))?;
+            
+            new_table_id
         }
     };
     
@@ -603,31 +715,45 @@ fn set_exit_node_impl(peer_id: &Uuid, network: &Network) -> Result<(), PolicyRou
     
     // Parse rules once for all cleanup operations
     let all_rules = get_ip_rules_cached()?;
+    let lan_interface = find_lan_interface().unwrap_or_else(|_| "eth0".to_string());
+    
+    // ALWAYS clean up stale exit node rules from OTHER peer tables (not the current exit node's table)
+    // This handles cases where rules from previous exit nodes were not properly cleaned up
+    for rule in &all_rules {
+        // Only process exit node rules (priority >= 20000)
+        if rule.priority < 20000 {
+            continue;
+        }
+        
+        // Skip rules that belong to the current exit node's table
+        if rule.table_id == Some(table_id) {
+            continue;
+        }
+        
+        // Check if this is a LAN exit node rule from another table
+        let is_stale_lan_exit_rule = rule.iif == Some(lan_interface.clone())
+            && rule.table_id.is_some()
+            && (rule.to.is_none() || rule.to == Some("0.0.0.0/0".to_string()));
+        
+        // Check if this is a WireGuard peer exit node rule from another table
+        let is_stale_wg_exit_rule = rule.from == Some(wg_subnet.clone())
+            && rule.iif == Some(wg_interface.to_string())
+            && rule.table_id.is_some()
+            && (rule.to.is_none() || rule.to == Some("0.0.0.0/0".to_string()));
+        
+        if is_stale_lan_exit_rule || is_stale_wg_exit_rule {
+            let priority_str = rule.priority.to_string();
+            let stale_table = rule.table_id.unwrap_or(0);
+            let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
+            log::info!("Removed stale exit node rule: priority {} -> table {} (current exit node uses table {})", 
+                      rule.priority, stale_table, table_id);
+        }
+    }
     
     if let Some(old_table_id) = old_exit_node {
         if old_table_id != table_id {
             log::info!("Removing old exit node rule for table {}", old_table_id);
-            // Find and remove old exit node rules using parsed rules
-            for rule in &all_rules {
-                // Remove LAN exit node rules
-                if rule.to == Some("0.0.0.0/0".to_string()) 
-                    && rule.table_id == Some(old_table_id) 
-                    && rule.priority >= 20000 {
-                    let priority_str = rule.priority.to_string();
-                    let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
-                    log::debug!("Removed old LAN exit node rule with priority {}", rule.priority);
-                }
-                // Remove WireGuard peer exit node rules
-                if rule.from == Some(wg_subnet.clone())
-                    && rule.iif == Some(wg_interface.to_string())
-                    && rule.to == Some("0.0.0.0/0".to_string())
-                    && rule.table_id == Some(old_table_id)
-                    && rule.priority >= 20000 {
-                    let priority_str = rule.priority.to_string();
-                    let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
-                    log::debug!("Removed old WireGuard peer exit node rule with priority {}", rule.priority);
-                }
-            }
+            
             // Also remove old LAN exception rules if they exist
             if let Some(lan_cidr_str) = &state.lan_cidr {
                 let lan_cidrs = parse_lan_cidrs(lan_cidr_str);
@@ -897,10 +1023,11 @@ fn set_exit_node_impl(peer_id: &Uuid, network: &Network) -> Result<(), PolicyRou
     // First, remove any existing rule for this table using parsed rules
     for rule in &all_rules {
         // Check if this rule matches our criteria (iif lan_interface and lookup our table)
+        // Note: `to 0.0.0.0/0` may appear as `to = None` in parsed output
         if rule.iif == Some(lan_interface.clone())
-            && rule.to == Some("0.0.0.0/0".to_string())
             && rule.table_id == Some(table_id)
-            && rule.priority >= 20000 {
+            && rule.priority >= 20000
+            && (rule.to.is_none() || rule.to == Some("0.0.0.0/0".to_string())) {
             let priority_str = rule.priority.to_string();
             let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
             log::debug!("Removed old exit node rule with priority {}", rule.priority);
@@ -957,11 +1084,12 @@ fn set_exit_node_impl(peer_id: &Uuid, network: &Network) -> Result<(), PolicyRou
     // Remove old WireGuard peer rules for this table if they exist (using already parsed rules)
     for rule in &all_rules {
         // Check if this rule matches our criteria (from wg_subnet, iif wg_interface, lookup our table)
+        // Note: `to 0.0.0.0/0` may appear as `to = None` in parsed output
         if rule.from == Some(wg_subnet.clone())
             && rule.iif == Some(wg_interface.to_string())
-            && rule.to == Some("0.0.0.0/0".to_string())
             && rule.table_id == Some(table_id)
-            && rule.priority >= 20000 {
+            && rule.priority >= 20000
+            && (rule.to.is_none() || rule.to == Some("0.0.0.0/0".to_string())) {
             let priority_str = rule.priority.to_string();
             let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
             log::debug!("Removed old WireGuard peer exit node rule with priority {}", rule.priority);
@@ -1028,30 +1156,32 @@ fn set_exit_node_impl(peer_id: &Uuid, network: &Network) -> Result<(), PolicyRou
     let new_public_key_b64 = new_public_key.to_base64();
     
     // Get current allowed IPs for the new peer (excluding 0.0.0.0/0)
-    let mut current_allowed_ips = Vec::new();
+    // IMPORTANT: AllowedIPs should be from the ROUTER's perspective - what IPs to route to this peer
+    // The peer's own address should always be included so we can reach the peer
+    let mut current_allowed_ips = vec![format!("{}/32", new_peer.address)];
+    
     for (conn_id, conn_details) in &network.connections {
         if conn_id.contains(peer_id) && conn_id.contains(&network.this_peer) {
-            let (other_id, allowed_ips) = if conn_id.a == *peer_id {
-                (&conn_id.b, &conn_details.allowed_ips_a_to_b)
+            // Get allowed_ips based on ROUTER's position in the connection
+            // If router is peer A, use allowed_ips_a_to_b (router's config for the other peer)
+            // If router is peer B, use allowed_ips_b_to_a (router's config for the other peer)
+            let allowed_ips = if conn_id.a == network.this_peer {
+                &conn_details.allowed_ips_a_to_b
             } else {
-                (&conn_id.a, &conn_details.allowed_ips_b_to_a)
+                &conn_details.allowed_ips_b_to_a
             };
-            if other_id == &network.this_peer {
-                // This is the connection to the router
-                for ip in allowed_ips {
-                    let ip_str = ip.to_string();
-                    if ip_str != "0.0.0.0/0" && ip_str != "default" {
-                        current_allowed_ips.push(ip_str);
-                    }
+            
+            for ip in allowed_ips {
+                let ip_str = ip.to_string();
+                // Exclude 0.0.0.0/0 (will be added separately), default, and peer's own address (already added)
+                if ip_str != "0.0.0.0/0" 
+                    && ip_str != "default" 
+                    && ip_str != format!("{}/32", new_peer.address) {
+                    current_allowed_ips.push(ip_str);
                 }
-                break;
             }
+            break;
         }
-    }
-    
-    // If no other IPs, use the peer's own address
-    if current_allowed_ips.is_empty() {
-        current_allowed_ips.push(format!("{}/32", new_peer.address));
     }
     
     // Add 0.0.0.0/0 to the list
@@ -1259,13 +1389,21 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                         if health.is_online {
                                             // Offline → Online
                                             let handshake_info = health.last_handshake
-                                                .map(|ts| {
+                                                .and_then(|ts| {
+                                                    // Only show handshake time if it's valid (non-zero and within last year)
+                                                    if ts == 0 {
+                                                        return None;
+                                                    }
                                                     let now = std::time::SystemTime::now()
                                                         .duration_since(std::time::UNIX_EPOCH)
                                                         .map(|d| d.as_secs())
                                                         .unwrap_or(0);
                                                     let ago = now.saturating_sub(ts);
-                                                    format!("handshake {}s ago", ago)
+                                                    // If more than a year ago, timestamp is likely invalid
+                                                    if ago > 31536000 {
+                                                        return None;
+                                                    }
+                                                    Some(format!("handshake {}s ago", ago))
                                                 })
                                                 .unwrap_or_else(|| "ping successful".to_string());
                                             let latency_info = health.latency_ms
@@ -1284,8 +1422,8 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                                             .duration_since(std::time::UNIX_EPOCH)
                                                             .map(|d| d.as_secs())
                                                             .unwrap_or(0);
-                                                        let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
-                                                        *tracker = Some((peer_id_clone, now));
+                                                        // Persist the fail-back timer (Bug 1 fix)
+                                                        persist_primary_online_since(Some(peer_id_clone), Some(now));
                                                         log::info!(
                                                             "Smart Gateway: Primary {} came back online, will fail-back in {}s if stable",
                                                             peer_name, FAILBACK_STABILITY_SECS
@@ -1296,13 +1434,21 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                         } else {
                                             // Online → Offline
                                             let handshake_info = old.last_handshake
-                                                .map(|ts| {
+                                                .and_then(|ts| {
+                                                    // Only show handshake time if it's valid (non-zero and within last year)
+                                                    if ts == 0 {
+                                                        return None;
+                                                    }
                                                     let now = std::time::SystemTime::now()
                                                         .duration_since(std::time::UNIX_EPOCH)
                                                         .map(|d| d.as_secs())
                                                         .unwrap_or(0);
                                                     let ago = now.saturating_sub(ts);
-                                                    format!("last handshake was {}s ago", ago)
+                                                    // If more than a year ago, timestamp is likely invalid
+                                                    if ago > 31536000 {
+                                                        return None;
+                                                    }
+                                                    Some(format!("last handshake was {}s ago", ago))
                                                 })
                                                 .unwrap_or_else(|| "no handshake".to_string());
                                             let loss_info = health.packet_loss_percent
@@ -1317,6 +1463,17 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                             if let Ok(Some(current_exit)) = get_exit_node() {
                                                 if current_exit == peer_id_clone {
                                                     if let Ok(true) = get_auto_failover() {
+                                                        // Bug 3 fix: Don't failover during startup grace period
+                                                        if is_in_startup_grace_period() {
+                                                            log::info!("Smart Gateway: Skipping failover during startup grace period ({}s remaining)", 
+                                                                STARTUP_GRACE_PERIOD_SECS.saturating_sub(
+                                                                    std::time::SystemTime::now()
+                                                                        .duration_since(std::time::UNIX_EPOCH)
+                                                                        .map(|d| d.as_secs())
+                                                                        .unwrap_or(0)
+                                                                        .saturating_sub(*SERVICE_START_TIME.read().unwrap())
+                                                                ));
+                                                        } else {
                                                         log::info!("Smart Gateway: Current exit node {} went offline, triggering failover...", peer_name);
                                                         
                                                         // Find best healthy alternative from cache
@@ -1353,16 +1510,21 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                                         } else {
                                                             log::warn!("Smart Gateway: No healthy alternatives available for failover");
                                                         }
+                                                        } // Close the else block for startup grace period check
                                                     }
                                                 }
                                             }
                                             
                                             // Clear fail-back tracking if primary went offline
-                                            let mut primary_tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
-                                            if let Some((tracked_id, _)) = *primary_tracker {
-                                                if tracked_id == peer_id_clone {
-                                                    *primary_tracker = None;
-                                                    log::debug!("Smart Gateway: Primary {} went offline, resetting fail-back timer", peer_name);
+                                            {
+                                                let tracker = PRIMARY_ONLINE_SINCE.read().unwrap();
+                                                if let Some((tracked_id, _)) = *tracker {
+                                                    if tracked_id == peer_id_clone {
+                                                        drop(tracker);
+                                                        // Persist the cleared timer (Bug 1 fix)
+                                                        persist_primary_online_since(None, None);
+                                                        log::debug!("Smart Gateway: Primary {} went offline, resetting fail-back timer", peer_name);
+                                                    }
                                                 }
                                             }
                                         }
@@ -1406,8 +1568,8 @@ pub async fn start_health_monitor() -> std::io::Result<()> {
                                                                     );
                                                                     // Clear primary tracking - we're back on primary
                                                                     let _ = set_primary_exit_node(None);
-                                                                    let mut tracker = PRIMARY_ONLINE_SINCE.write().unwrap();
-                                                                    *tracker = None;
+                                                                    // Persist the cleared timer (Bug 1 fix)
+                                                                    persist_primary_online_since(None, None);
                                                                 }
                                                                 Err(e) => {
                                                                     log::error!(
@@ -1601,8 +1763,11 @@ async fn check_peer_health_impl_async(
                 })
             }
         } else {
-            // Peer is offline - use last successful ping time (when it was last seen online)
-            // This is used for "Down Since" display
+            // Peer is offline - remove from SESSION_UP_SINCE so next online transition gets fresh timestamp
+            let mut session_up_since_map = session_up_since.write().unwrap();
+            session_up_since_map.remove(&peer_id);
+            
+            // Return last successful ping time (when it was last seen online) for "Down Since" display
             last_successful_ping_map.get(&peer_id_str).copied()
         }
     };
@@ -1850,9 +2015,10 @@ pub fn remove_peer_routing_table_impl(peer_id: &Uuid, table_id: u32, network: Op
             // Parse rules once and remove exit node rules
             if let Ok(rules) = get_ip_rules_cached() {
                 for rule in &rules {
-                    if rule.to == Some("0.0.0.0/0".to_string())
-                        && rule.table_id == Some(table_id)
-                        && rule.priority >= 20000 {
+                    // Note: `to 0.0.0.0/0` may appear as `to = None` in parsed output
+                    if rule.table_id == Some(table_id)
+                        && rule.priority >= 20000
+                        && (rule.to.is_none() || rule.to == Some("0.0.0.0/0".to_string())) {
                         let priority_str = rule.priority.to_string();
                         let _ = shell_cmd(&["ip", "rule", "del", "priority", &priority_str]);
                         log::info!("Removed exit node rule with priority {}", rule.priority);

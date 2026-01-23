@@ -38,6 +38,7 @@ async fn get_version(req: HttpRequest) -> impl Responder {
 
 #[derive(serde::Deserialize)]
 pub(crate) struct SummaryBody {
+    #[serde(default)]
     pub(crate) only_digest: bool,
 }
 
@@ -152,6 +153,57 @@ pub async fn post_auto_failover(req: HttpRequest, body: web::Bytes) -> impl Resp
         return e;
     }
     ui_mode::set_auto_failover(req, body).await
+}
+
+#[derive(serde::Deserialize)]
+pub(crate) struct LogsQuery {
+    #[serde(default = "default_log_lines")]
+    pub(crate) lines: usize,
+}
+
+fn default_log_lines() -> usize {
+    100
+}
+
+#[get("/api/system/logs")]
+pub async fn get_system_logs(req: HttpRequest, query: web::Query<LogsQuery>) -> impl Responder {
+    if let Err(e) = enforce_auth(req) {
+        return e;
+    }
+    
+    // Fetch logs from journalctl for wg-quickrs service
+    let lines = query.lines.min(1000); // Cap at 1000 lines
+    
+    match std::process::Command::new("journalctl")
+        .args(["-u", "wg-quickrs", "-n", &lines.to_string(), "--no-pager", "-o", "short-iso"])
+        .output()
+    {
+        Ok(output) => {
+            let logs = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            
+            if !output.status.success() && logs.is_empty() {
+                // Try alternative: read from /var/log if journalctl fails
+                HttpResponse::Ok().json(serde_json::json!({
+                    "logs": format!("journalctl error: {}", stderr),
+                    "source": "journalctl",
+                    "lines": 0
+                }))
+            } else {
+                let line_count = logs.lines().count();
+                HttpResponse::Ok().json(serde_json::json!({
+                    "logs": logs,
+                    "source": "journalctl",
+                    "lines": line_count
+                }))
+            }
+        }
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": format!("Failed to fetch logs: {}", e)
+            }))
+        }
+    }
 }
 
 // Init endpoints (no auth required - used before config exists)

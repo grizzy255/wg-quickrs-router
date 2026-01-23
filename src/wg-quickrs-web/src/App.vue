@@ -20,7 +20,7 @@
           <!-- Dark Mode Toggle -->
           <button
               @click="toggleDarkMode"
-              class="h-8 w-8 rounded-md bg-button text-text-button hover:bg-button-hover flex items-center justify-center transition-colors"
+              class="h-8 w-8 rounded-md bg-button text-button hover:bg-button-hover flex items-center justify-center transition-colors"
               :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
             <Sun v-if="isDarkMode" :size="20" />
             <Moon v-else :size="20" />
@@ -29,15 +29,27 @@
           <div class="relative">
             <button
                 :class="[settingsDropdownOpen ? 'bg-button-hover': '']"
-                class="h-8 w-8 rounded-md bg-button text-text-button hover:bg-button-hover flex items-center justify-center transition-colors"
+                class="h-8 w-8 rounded-md bg-button text-button hover:bg-button-hover flex items-center justify-center transition-colors"
                 @click="settingsDropdownOpen = !settingsDropdownOpen">
               <Settings :size="20" />
             </button>
             <!-- Settings Dropdown -->
             <div v-if="settingsDropdownOpen"
-                 class="absolute right-0 top-10 w-24 bg-dropdown border border-divider rounded-md shadow-lg z-20">
+                 class="absolute right-0 top-10 w-36 bg-dropdown border border-divider rounded-md shadow-lg z-20">
               <button
-                  class="block w-full text-left px-3 py-2 text-sm text-text-button hover:bg-button rounded-md flex items-center"
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button rounded-t-md flex items-center"
+                  @click="settingsDropdownOpen = false; dialogId = 'logs';">
+                <ScrollText :size="16" class="mr-2" />
+                <span>Logs</span>
+              </button>
+              <button
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button flex items-center"
+                  @click="settingsDropdownOpen = false; dialogId = 'api-reference';">
+                <Code :size="16" class="mr-2" />
+                <span>API Reference</span>
+              </button>
+              <button
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button rounded-b-md flex items-center"
                   @click="settingsDropdownOpen = false; logout();">
                 <LogOut :size="16" class="mr-2" />
                 <span>Logout</span>
@@ -98,7 +110,9 @@
                 :api="api"
                 :network="network"
                 @toggle="handleRouterModeToggle"
-                @update:lan-cidr="handleRouterModeLanCidrUpdate">
+                @update:lan-cidr="handleRouterModeLanCidrUpdate"
+                @update:exit-node="currentExitNode = $event"
+                @update:health-status="gatewayHealthStatus = $event">
             </router-mode>
           </div>
         </div>
@@ -106,7 +120,9 @@
         <!-- Traffic Analysis Card (Full Width) -->
         <traffic-analysis-card
             :network="network"
-            :telemetry="telemetry">
+            :telemetry="telemetry"
+            :active-gateway="currentExitNode"
+            :health-status="gatewayHealthStatus">
         </traffic-analysis-card>
 
         <!-- Network Topology Card -->
@@ -254,6 +270,19 @@
       </div>
     </custom-dialog>
 
+    <!-- Dialog: API Reference -->
+    <api-reference-dialog 
+        v-if="dialogId === 'api-reference'"
+        @close="dialogId = ''">
+    </api-reference-dialog>
+
+    <!-- Dialog: System Logs -->
+    <logs-dialog
+        v-if="dialogId === 'logs'"
+        :api="api"
+        @close="dialogId = ''">
+    </logs-dialog>
+
   </div>
 </template>
 
@@ -270,7 +299,9 @@ import InitWizard from "@/src/components/init-wizard.vue";
 import SystemHealthCard from "@/src/components/cards/SystemHealthCard.vue";
 import ControlCenterCard from "@/src/components/cards/ControlCenterCard.vue";
 import TrafficAnalysisCard from "@/src/components/cards/TrafficAnalysisCard.vue";
-import { Settings, LogOut, Router, Network, Plus, Sun, Moon } from 'lucide-vue-next';
+import { Settings, LogOut, Router, Network, Plus, Sun, Moon, Code, ScrollText } from 'lucide-vue-next';
+import ApiReferenceDialog from "@/src/components/dialogs/api-reference-dialog.vue";
+import LogsDialog from "@/src/components/dialogs/logs-dialog.vue";
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -300,7 +331,11 @@ export default {
     Network,
     Plus,
     Sun,
-    Moon
+    Moon,
+    Code,
+    ScrollText,
+    ApiReferenceDialog,
+    LogsDialog
   },
   data() {
     return {
@@ -334,7 +369,9 @@ export default {
       lanAccessLoading: {},  // Track LAN access toggle loading: { peerId: boolean }
       peerControlLoading: {}, // Track peer control loading: { peerId: 'reconnect'|'stop'|'start' }
       autoFailover: false,   // Smart Gateway - auto failover enabled
-      autoFailoverLoading: false // Smart Gateway toggle loading state
+      autoFailoverLoading: false, // Smart Gateway toggle loading state
+      currentExitNode: null,  // Current active exit node (for traffic filtering)
+      gatewayHealthStatus: {} // Health status for gateway peers (latency, packet loss)
     }
   },
   async mounted() {

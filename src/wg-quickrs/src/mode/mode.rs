@@ -133,6 +133,7 @@ pub fn switch_mode(
                 peer_lan_access: std::collections::HashMap::new(),
                 auto_failover: false,
                 primary_exit_node: None,
+                primary_online_since: None,
             };
             
             if let Err(e) = save_mode_state(&state) {
@@ -330,6 +331,15 @@ pub fn update_lan_cidr(new_cidr: &str) -> Result<(), ModeError> {
 fn enable_packet_forwarding() -> Result<(), ModeError> {
     shell_cmd(&["sysctl", "-w", "net.ipv4.ip_forward=1"])
         .map_err(|e| ModeError::RoutingError(format!("Failed to enable packet forwarding: {}", e)))?;
+    
+    // Enable TCP MTU probing to help with path MTU discovery through VPN tunnels
+    // This helps prevent "some sites don't load" issues caused by MTU black holes
+    if let Err(e) = shell_cmd(&["sysctl", "-w", "net.ipv4.tcp_mtu_probing=1"]) {
+        log::warn!("Failed to enable TCP MTU probing: {} (non-fatal)", e);
+    } else {
+        log::info!("Enabled TCP MTU probing for better path MTU discovery");
+    }
+    
     Ok(())
 }
 
@@ -411,6 +421,7 @@ pub fn initialize_mode_on_startup() -> Result<(), ModeError> {
                         peer_lan_access: std::collections::HashMap::new(),
                         auto_failover: false,
                         primary_exit_node: None,
+                        primary_online_since: None,
                     };
                     if let Err(e) = save_mode_state(&fresh_state) {
                         log::warn!("Failed to save recovered state: {}", e);
@@ -689,7 +700,8 @@ pub fn restore_peer_routes_after_interface_up() -> Result<(), ModeError> {
         log::warn!("Failed to restore routing tables for {} peer(s)", failed_count);
     }
     
-    // Restore exit node from persisted state
+    // Restore exit node from persisted state, or auto-select from config if none persisted
+    let mut exit_node_restored = false;
     if let Some(exit_node_id) = routing_pbr::get_exit_node().unwrap_or(None) {
         // Verify exit node still exists in config before restoring
         let exit_node_id_str = exit_node_id.to_string();
@@ -701,9 +713,65 @@ pub fn restore_peer_routes_after_interface_up() -> Result<(), ModeError> {
                 log::warn!("Failed to restore exit node: {}", e);
             } else {
                 log::info!("Successfully restored exit node: {}", exit_node_id);
+                exit_node_restored = true;
             }
         } else {
             log::warn!("Exit node {} from persisted state no longer exists in config. Skipping exit node restoration.", exit_node_id_str);
+        }
+    }
+    
+    // If no exit node was restored from persisted state, auto-select from config
+    // This handles the case where peers have 0.0.0.0/0 configured but no exit node was ever set
+    if !exit_node_restored {
+        let peers_with_default = routing_pbr::get_peers_with_default_route(&config.network);
+        if !peers_with_default.is_empty() {
+            let first_exit_peer = peers_with_default[0];
+            let peer_name = config.network.peers.get(&first_exit_peer)
+                .map(|p| p.name.clone())
+                .unwrap_or_else(|| first_exit_peer.to_string());
+            log::info!("No exit node persisted. Auto-selecting first peer with default route as exit node: {} ({})", 
+                      peer_name, first_exit_peer);
+            let network_clone = config.network.clone();
+            if let Err(e) = routing_pbr::set_exit_node(&first_exit_peer, Some(&network_clone)) {
+                log::warn!("Failed to auto-select exit node {}: {}", first_exit_peer, e);
+            } else {
+                log::info!("Successfully auto-selected exit node: {} ({})", peer_name, first_exit_peer);
+            }
+        } else {
+            log::debug!("No peers with default route (0.0.0.0/0) configured. No exit node to set.");
+        }
+    }
+    
+    // Reload state from disk before saving - set_exit_node() may have modified it
+    // This ensures we don't overwrite changes made by set_exit_node()
+    let state = match load_mode_state() {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            log::warn!("Mode state disappeared after route restoration");
+            return Ok(());
+        }
+        Err(e) => {
+            log::warn!("Failed to reload mode state after route restoration: {}", e);
+            return Ok(());
+        }
+    };
+    
+    // Bug 2 fix: Restore fail-back timer from persisted state
+    routing_pbr::restore_primary_online_since_from_state();
+    
+    // Bug 2 fix: If auto-failover is enabled and we have a primary that's different from current exit,
+    // check if we should start fail-back timer (primary might have come online while service was down)
+    if state.auto_failover {
+        if let Some(ref primary_str) = state.primary_exit_node {
+            if let Ok(primary_id) = uuid::Uuid::parse_str(primary_str) {
+                // Check if current exit node is different from primary
+                if let Ok(Some(current_exit)) = routing_pbr::get_exit_node() {
+                    if current_exit != primary_id {
+                        log::info!("Smart Gateway: Auto-failover is enabled and we're on backup. Will monitor primary {} for fail-back.", primary_str);
+                        // The health monitoring loop will check if primary is online and start the timer
+                    }
+                }
+            }
         }
     }
     

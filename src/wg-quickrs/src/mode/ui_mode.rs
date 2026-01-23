@@ -307,6 +307,15 @@ pub async fn update_peer_route_status(_req: HttpRequest, body: actix_web::web::B
         match super::routing_pbr::set_exit_node(&peer_uuid, None) {
             Ok(_) => {
                 log::info!("Successfully set peer {} as exit node", active_peer_id);
+                
+                // Bug 4 fix: Clear primary_exit_node on manual gateway switch
+                // This prevents automatic fail-back to a stale primary after user manually changes gateway
+                if let Err(e) = super::routing_pbr::set_primary_exit_node(None) {
+                    log::warn!("Failed to clear primary exit node after manual switch: {}", e);
+                } else {
+                    log::debug!("Cleared primary exit node after manual gateway switch");
+                }
+                
                 HttpResponse::Ok().json(serde_json::json!({
                     "success": true,
                     "message": format!("Set peer {} as exit node for default route", active_peer_id)

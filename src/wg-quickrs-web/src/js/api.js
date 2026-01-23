@@ -237,4 +237,11 @@ export default class API {
         });
     }
 
+    async get_system_logs(lines = 100) {
+        return this.call({
+            method: 'get',
+            path: `/api/system/logs?lines=${lines}`,
+        });
+    }
+
 }

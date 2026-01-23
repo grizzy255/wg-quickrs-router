@@ -262,29 +262,29 @@ pub(crate) fn sync_conf(config: &Config) -> Result<(), WireGuardCommandError> {
                     let public_key_b64 = public_key.to_base64();
                     
                     // Get current allowed IPs for the exit node (excluding 0.0.0.0/0)
-                    let mut current_allowed_ips = Vec::new();
+                    // Always include peer's own address first so we can reach the peer
+                    let mut current_allowed_ips = vec![format!("{}/32", exit_peer.address)];
+                    
                     for (conn_id, conn_details) in &config.network.connections {
                         if conn_id.contains(&exit_node_id) && conn_id.contains(&config.network.this_peer) {
-                            let (other_id, allowed_ips) = if conn_id.a == exit_node_id {
-                                (&conn_id.b, &conn_details.allowed_ips_a_to_b)
+                            // Get allowed_ips based on ROUTER's position in the connection
+                            let allowed_ips = if conn_id.a == config.network.this_peer {
+                                &conn_details.allowed_ips_a_to_b
                             } else {
-                                (&conn_id.a, &conn_details.allowed_ips_b_to_a)
+                                &conn_details.allowed_ips_b_to_a
                             };
-                            if other_id == &config.network.this_peer {
-                                for ip in allowed_ips {
-                                    let ip_str = ip.to_string();
-                                    if ip_str != "0.0.0.0/0" && ip_str != "default" {
-                                        current_allowed_ips.push(ip_str);
-                                    }
+                            
+                            for ip in allowed_ips {
+                                let ip_str = ip.to_string();
+                                // Exclude 0.0.0.0/0, default, and peer's own address (already added)
+                                if ip_str != "0.0.0.0/0" 
+                                    && ip_str != "default" 
+                                    && ip_str != format!("{}/32", exit_peer.address) {
+                                    current_allowed_ips.push(ip_str);
                                 }
-                                break;
                             }
+                            break;
                         }
-                    }
-                    
-                    // If no other IPs, use the peer's own address
-                    if current_allowed_ips.is_empty() {
-                        current_allowed_ips.push(format!("{}/32", exit_peer.address));
                     }
                     
                     // Add 0.0.0.0/0 to the list
@@ -412,29 +412,29 @@ pub(crate) fn enable_tunnel() -> Result<(), WireGuardCommandError> {
                         let public_key_b64 = public_key.to_base64();
                         
                         // Get current allowed IPs for the exit node (excluding 0.0.0.0/0)
-                        let mut current_allowed_ips = Vec::new();
+                        // Always include peer's own address first so we can reach the peer
+                        let mut current_allowed_ips = vec![format!("{}/32", exit_peer.address)];
+                        
                         for (conn_id, conn_details) in &cfg.network.connections {
                             if conn_id.contains(&exit_node_id) && conn_id.contains(&cfg.network.this_peer) {
-                                let (other_id, allowed_ips) = if conn_id.a == exit_node_id {
-                                    (&conn_id.b, &conn_details.allowed_ips_a_to_b)
+                                // Get allowed_ips based on ROUTER's position in the connection
+                                let allowed_ips = if conn_id.a == cfg.network.this_peer {
+                                    &conn_details.allowed_ips_a_to_b
                                 } else {
-                                    (&conn_id.a, &conn_details.allowed_ips_b_to_a)
+                                    &conn_details.allowed_ips_b_to_a
                                 };
-                                if other_id == &cfg.network.this_peer {
-                                    for ip in allowed_ips {
-                                        let ip_str = ip.to_string();
-                                        if ip_str != "0.0.0.0/0" && ip_str != "default" {
-                                            current_allowed_ips.push(ip_str);
-                                        }
+                                
+                                for ip in allowed_ips {
+                                    let ip_str = ip.to_string();
+                                    // Exclude 0.0.0.0/0, default, and peer's own address (already added)
+                                    if ip_str != "0.0.0.0/0" 
+                                        && ip_str != "default" 
+                                        && ip_str != format!("{}/32", exit_peer.address) {
+                                        current_allowed_ips.push(ip_str);
                                     }
-                                    break;
                                 }
+                                break;
                             }
-                        }
-                        
-                        // If no other IPs, use the peer's own address
-                        if current_allowed_ips.is_empty() {
-                            current_allowed_ips.push(format!("{}/32", exit_peer.address));
                         }
                         
                         // Add 0.0.0.0/0 to the list

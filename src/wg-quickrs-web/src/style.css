@@ -58,8 +58,8 @@
   --text-primary: #f9fafb;        /* gray-50 */
   --text-secondary: #9ca3af;     /* gray-400 */
   --text-muted: #9ca3af;         /* gray-400 */
-  --text-icon: #6b7280;          /* gray-500 */
-  --text-button: #d1d5db;        /* gray-300 */
+  --text-icon: #d1d5db;          /* gray-300 - visible on dark backgrounds */
+  --text-button: #e5e7eb;        /* gray-200 - better contrast in dark mode */
   
   /* Borders */
   --border-default: #374151;     /* gray-700 */

@@ -7,15 +7,22 @@
 
 use super::mode::SystemMode;
 use crate::WG_QUICKRS_CONFIG_FOLDER;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::Mutex;
 use thiserror::Error;
 
 const MODE_STATE_FILE: &str = "router_mode_state.json";
+const MODE_STATE_TEMP_FILE: &str = "router_mode_state.json.tmp";
+
+// Global mutex to prevent concurrent state file operations
+// This prevents race conditions where multiple threads try to save/load simultaneously
+static STATE_FILE_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 #[derive(Error, Debug)]
 pub enum PersistenceError {
@@ -45,6 +52,8 @@ pub struct ModeState {
     pub auto_failover: bool, // Smart Gateway - automatically switch to healthy peer when exit node goes offline
     #[serde(default)]
     pub primary_exit_node: Option<String>, // User's preferred gateway - for fail-back after failover
+    #[serde(default)]
+    pub primary_online_since: Option<u64>, // Timestamp when primary came back online (for fail-back timing)
 }
 
 fn default_peer_lan_access() -> HashMap<String, bool> {
@@ -68,9 +77,19 @@ fn get_state_file_path() -> Result<PathBuf, PersistenceError> {
     Ok(config_folder.join(MODE_STATE_FILE))
 }
 
-// Save mode state to file
+// Save mode state to file using atomic writes
+// This prevents file corruption from concurrent access or interrupted writes
 pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
+    // Acquire lock to prevent concurrent state file operations
+    let _lock = STATE_FILE_LOCK.lock().map_err(|e| {
+        PersistenceError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to acquire state file lock: {}", e)
+        ))
+    })?;
+    
     let file_path = get_state_file_path()?;
+    let temp_path = file_path.with_file_name(MODE_STATE_TEMP_FILE);
     
     // Ensure config folder exists
     if let Some(parent) = file_path.parent() {
@@ -82,21 +101,51 @@ pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
     let json = serde_json::to_string_pretty(state)
         .map_err(|e| PersistenceError::SerializationError(e.to_string()))?;
     
-    // Write to file
-    let mut file = File::create(&file_path)
-        .map_err(|e| PersistenceError::IoError(e))?;
+    // ATOMIC WRITE: Write to temp file first
+    {
+        let mut file = File::create(&temp_path)
+            .map_err(|e| PersistenceError::IoError(e))?;
+        
+        file.write_all(json.as_bytes())
+            .map_err(|e| PersistenceError::IoError(e))?;
+        
+        // Ensure data is flushed to disk before renaming
+        file.sync_all()
+            .map_err(|e| PersistenceError::IoError(e))?;
+    }
     
-    file.write_all(json.as_bytes())
-        .map_err(|e| PersistenceError::IoError(e))?;
+    // ATOMIC RENAME: Replace the original file with the temp file
+    // This is atomic on most filesystems (ext4, etc.)
+    fs::rename(&temp_path, &file_path)
+        .map_err(|e| {
+            // If rename fails, try to clean up temp file
+            let _ = fs::remove_file(&temp_path);
+            PersistenceError::IoError(e)
+        })?;
     
-    log::debug!("Saved router mode state to {:?}", file_path);
+    log::debug!("Saved router mode state to {:?} (atomic write)", file_path);
     Ok(())
 }
 
 // Load mode state from file
 // Self-healing: if file is empty or corrupted, delete it and return None
 pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
+    // Acquire lock to prevent concurrent state file operations
+    let _lock = STATE_FILE_LOCK.lock().map_err(|e| {
+        PersistenceError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to acquire state file lock: {}", e)
+        ))
+    })?;
+    
     let file_path = get_state_file_path()?;
+    let temp_path = file_path.with_file_name(MODE_STATE_TEMP_FILE);
+    
+    // Clean up any leftover temp file from interrupted writes
+    if temp_path.exists() {
+        log::debug!("Cleaning up leftover temp state file");
+        let _ = fs::remove_file(&temp_path);
+    }
     
     // Check if file exists
     if !file_path.exists() {
@@ -138,13 +187,27 @@ pub fn load_mode_state() -> Result<Option<ModeState>, PersistenceError> {
 
 // Clear mode state (when switching to Host Mode)
 pub fn clear_mode_state() -> Result<(), PersistenceError> {
+    // Acquire lock to prevent concurrent state file operations
+    let _lock = STATE_FILE_LOCK.lock().map_err(|e| {
+        PersistenceError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to acquire state file lock: {}", e)
+        ))
+    })?;
+    
     let file_path = get_state_file_path()?;
+    let temp_path = file_path.with_file_name(MODE_STATE_TEMP_FILE);
     
     // Delete the state file if it exists
     if file_path.exists() {
         fs::remove_file(&file_path)
             .map_err(|e| PersistenceError::IoError(e))?;
         log::info!("Cleared router mode state file {:?}", file_path);
+    }
+    
+    // Also clean up any temp file
+    if temp_path.exists() {
+        let _ = fs::remove_file(&temp_path);
     }
     
     Ok(())

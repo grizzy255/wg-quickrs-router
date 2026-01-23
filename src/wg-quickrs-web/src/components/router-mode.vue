@@ -171,7 +171,7 @@ export default {
       default: null
     }
   },
-  emits: ['update:mode', 'update:lanCidr', 'toggle'],
+  emits: ['update:mode', 'update:lanCidr', 'toggle', 'update:exitNode', 'update:healthStatus'],
   data() {
     return {
       exitNode: null,
@@ -193,6 +193,17 @@ export default {
         this.selectedExitNode = null;
         this.stopHealthPolling();
       }
+    },
+    exitNode(newExitNode) {
+      // Emit the new exit node to parent component
+      this.$emit('update:exitNode', newExitNode);
+    },
+    healthStatus: {
+      handler(newHealthStatus) {
+        // Emit health status to parent component for the traffic graph
+        this.$emit('update:healthStatus', newHealthStatus);
+      },
+      deep: true
     }
   },
   mounted() {

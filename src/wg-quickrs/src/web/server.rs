@@ -147,6 +147,7 @@ async fn run_web_server_with_config(config: &Config, init_mode: bool) -> std::io
                         .service(api::get_peer_lan_access)
                         .service(api::get_auto_failover)
                         .service(api::post_auto_failover)
+                        .service(api::get_system_logs)
                 } else {
                     app
                 };
@@ -240,6 +241,7 @@ async fn run_web_server_with_config(config: &Config, init_mode: bool) -> std::io
                             .service(api::get_peer_lan_access)
                             .service(api::get_auto_failover)
                             .service(api::post_auto_failover)
+                            .service(api::get_system_logs)
                     } else {
                         app
                     };
