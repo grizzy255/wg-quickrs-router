@@ -129,24 +129,32 @@ export default {
     }
   },
   methods: {
-    async fetchLogs() {
-      this.loading = true;
+    async fetchLogs(silent = false) {
+      // Only show loading indicator on initial load or manual refresh
+      if (!silent) {
+        this.loading = true;
+      }
       this.error = null;
       
       try {
         const result = await this.api.get_system_logs(this.lineCount);
         if (result.logs) {
-          this.logs = result.logs.split('\n').filter(line => line.trim());
-          this.lastUpdate = new Date().toLocaleTimeString();
+          const newLogs = result.logs.split('\n').filter(line => line.trim());
           
-          if (this.autoScroll) {
-            this.$nextTick(() => {
-              const container = this.$el.querySelector('.overflow-auto');
-              if (container) {
-                container.scrollTop = container.scrollHeight;
-              }
-            });
+          // Only update if logs actually changed (prevents unnecessary re-render)
+          if (JSON.stringify(newLogs) !== JSON.stringify(this.logs)) {
+            this.logs = newLogs;
+            
+            if (this.autoScroll) {
+              this.$nextTick(() => {
+                const container = this.$el.querySelector('.overflow-auto');
+                if (container) {
+                  container.scrollTop = container.scrollHeight;
+                }
+              });
+            }
           }
+          this.lastUpdate = new Date().toLocaleTimeString();
         }
       } catch (err) {
         this.error = err.message || 'Failed to fetch logs';
@@ -178,10 +186,10 @@ export default {
   },
   mounted() {
     this.fetchLogs();
-    // Auto-refresh every 5 seconds
+    // Auto-refresh every 5 seconds (silent to avoid blink)
     this.refreshInterval = setInterval(() => {
       if (!this.loading) {
-        this.fetchLogs();
+        this.fetchLogs(true);
       }
     }, 5000);
     

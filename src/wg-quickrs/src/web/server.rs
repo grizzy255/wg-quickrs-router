@@ -148,6 +148,14 @@ async fn run_web_server_with_config(config: &Config, init_mode: bool) -> std::io
                         .service(api::get_auto_failover)
                         .service(api::post_auto_failover)
                         .service(api::get_system_logs)
+                        .service(api::get_routing_info)
+                        .service(api::post_diagnostics_ping)
+                        .service(api::post_diagnostics_traceroute)
+                        .service(api::post_diagnostics_dns)
+                        .service(api::post_diagnostics_mtu)
+                        .service(api::post_diagnostics_peer_check)
+                        .service(api::post_change_password)
+                        .service(api::get_password_status)
                 } else {
                     app
                 };
@@ -242,6 +250,14 @@ async fn run_web_server_with_config(config: &Config, init_mode: bool) -> std::io
                             .service(api::get_auto_failover)
                             .service(api::post_auto_failover)
                             .service(api::get_system_logs)
+                            .service(api::get_routing_info)
+                            .service(api::post_diagnostics_ping)
+                            .service(api::post_diagnostics_traceroute)
+                            .service(api::post_diagnostics_dns)
+                            .service(api::post_diagnostics_mtu)
+                            .service(api::post_diagnostics_peer_check)
+                            .service(api::post_change_password)
+                            .service(api::get_password_status)
                     } else {
                         app
                     };

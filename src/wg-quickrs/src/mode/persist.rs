@@ -104,11 +104,11 @@ pub fn save_mode_state(state: &ModeState) -> Result<(), PersistenceError> {
     // ATOMIC WRITE: Write to temp file first
     {
         let mut file = File::create(&temp_path)
-            .map_err(|e| PersistenceError::IoError(e))?;
-        
-        file.write_all(json.as_bytes())
-            .map_err(|e| PersistenceError::IoError(e))?;
-        
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
+    file.write_all(json.as_bytes())
+        .map_err(|e| PersistenceError::IoError(e))?;
+    
         // Ensure data is flushed to disk before renaming
         file.sync_all()
             .map_err(|e| PersistenceError::IoError(e))?;

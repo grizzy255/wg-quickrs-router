@@ -274,17 +274,17 @@ pub(crate) fn sync_conf(config: &Config) -> Result<(), WireGuardCommandError> {
                                 &conn_details.allowed_ips_b_to_a
                             };
                             
-                            for ip in allowed_ips {
-                                let ip_str = ip.to_string();
+                                for ip in allowed_ips {
+                                    let ip_str = ip.to_string();
                                 // Exclude 0.0.0.0/0, default, and peer's own address (already added)
                                 if ip_str != "0.0.0.0/0" 
                                     && ip_str != "default" 
                                     && ip_str != format!("{}/32", exit_peer.address) {
-                                    current_allowed_ips.push(ip_str);
+                                        current_allowed_ips.push(ip_str);
+                                    }
                                 }
+                                break;
                             }
-                            break;
-                        }
                     }
                     
                     // Add 0.0.0.0/0 to the list
@@ -424,17 +424,17 @@ pub(crate) fn enable_tunnel() -> Result<(), WireGuardCommandError> {
                                     &conn_details.allowed_ips_b_to_a
                                 };
                                 
-                                for ip in allowed_ips {
-                                    let ip_str = ip.to_string();
+                                    for ip in allowed_ips {
+                                        let ip_str = ip.to_string();
                                     // Exclude 0.0.0.0/0, default, and peer's own address (already added)
                                     if ip_str != "0.0.0.0/0" 
                                         && ip_str != "default" 
                                         && ip_str != format!("{}/32", exit_peer.address) {
-                                        current_allowed_ips.push(ip_str);
+                                            current_allowed_ips.push(ip_str);
+                                        }
                                     }
+                                    break;
                                 }
-                                break;
-                            }
                         }
                         
                         // Add 0.0.0.0/0 to the list

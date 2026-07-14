@@ -14,6 +14,11 @@ export default class API {
             headers["Authorization"] = `Bearer ${this.token}`;
         }
         
+        // Automatically add Content-Type for JSON bodies
+        if (body && !headers["Content-Type"]) {
+            headers["Content-Type"] = "application/json";
+        }
+        
         // Add cache-busting query parameter to prevent stale responses
         const separator = path.includes('?') ? '&' : '?';
         const cacheBuster = `_t=${Date.now()}`;
@@ -241,6 +246,73 @@ export default class API {
         return this.call({
             method: 'get',
             path: `/api/system/logs?lines=${lines}`,
+        });
+    }
+
+    async get_routing_info() {
+        return this.call({
+            method: 'get',
+            path: '/api/system/routing',
+        });
+    }
+
+    // Diagnostics endpoints
+    async diagnostics_ping(target, count = 4, iface = null) {
+        return this.call({
+            method: 'post',
+            path: '/api/system/diagnostics/ping',
+            body: { target, count, interface: iface }
+        });
+    }
+
+    async diagnostics_traceroute(target, max_hops = 20, iface = null) {
+        return this.call({
+            method: 'post',
+            path: '/api/system/diagnostics/traceroute',
+            body: { target, max_hops, interface: iface }
+        });
+    }
+
+    async diagnostics_dns(hostname, server = null, record_type = null) {
+        return this.call({
+            method: 'post',
+            path: '/api/system/diagnostics/dns',
+            body: { hostname, server, record_type }
+        });
+    }
+
+    async diagnostics_mtu(target, start_size = 1500, end_size = 1280, iface = null) {
+        return this.call({
+            method: 'post',
+            path: '/api/system/diagnostics/mtu',
+            body: { target, start_size, end_size, interface: iface }
+        });
+    }
+
+    async diagnostics_peer_check(peer_id) {
+        return this.call({
+            method: 'post',
+            path: '/api/system/diagnostics/peer-check',
+            body: { peer_id }
+        });
+    }
+
+    async get_password_status() {
+        return this.call({
+            method: 'get',
+            path: '/api/system/password/status'
+        });
+    }
+
+    async change_password(current_password, new_password) {
+        const body = { new_password };
+        if (current_password) {
+            body.current_password = current_password;
+        }
+        return this.call({
+            method: 'post',
+            path: '/api/system/password',
+            body
         });
     }
 

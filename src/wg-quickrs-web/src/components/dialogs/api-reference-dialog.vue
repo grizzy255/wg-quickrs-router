@@ -97,7 +97,15 @@ export default {
           name: 'System',
           icon: 'Server',
           endpoints: [
-            { method: 'GET', path: '/api/version', description: 'Get application version and build info' }
+            { method: 'GET', path: '/api/version', description: 'Get application version and build info' },
+            { method: 'GET', path: '/api/system/logs', description: 'Get system logs from journalctl. Optional: ?lines=100 (default 100)' },
+            { method: 'GET', path: '/api/system/routing', description: 'Get routing tables, IP rules, and WireGuard peer AllowedIPs' },
+            { method: 'POST', path: '/api/system/diagnostics/ping', description: 'Run ping to target. Body: {target, count?}' },
+            { method: 'POST', path: '/api/system/diagnostics/traceroute', description: 'Run traceroute to target. Body: {target, max_hops?}' },
+            { method: 'POST', path: '/api/system/diagnostics/dns', description: 'DNS lookup. Body: {hostname, server?, record_type?}' },
+            { method: 'POST', path: '/api/system/diagnostics/mtu', description: 'Test optimal MTU. Body: {target, start_size?, end_size?}' },
+            { method: 'POST', path: '/api/system/diagnostics/peer-check', description: 'Run diagnostic checks for troubleshooting. Body: {peer_id}' },
+            { method: 'POST', path: '/api/system/password', description: 'Change password. Body: {current_password, new_password}' }
           ]
         },
         {

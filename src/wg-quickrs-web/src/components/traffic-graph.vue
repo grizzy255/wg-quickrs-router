@@ -2,15 +2,15 @@
   <div class="w-full h-full flex flex-col gap-1">
     <!-- Main Traffic Graph -->
     <div class="relative flex-1 min-h-0">
-      <canvas ref="trafficCanvas" class="w-full h-full"></canvas>
-      
+    <canvas ref="trafficCanvas" class="w-full h-full"></canvas>
+
       <!-- Tx/Rx labels overlay -->
       <div class="absolute top-1 left-12 flex flex-col items-start space-y-0 text-xs bg-card/60 px-1.5 py-1 rounded backdrop-blur-sm">
-        <div class="font-semibold whitespace-pre-wrap text-blue-600/70 dark:text-blue-400/90">
-          Tx: {{ tx_avg }} <span class="text-blue-400/50 dark:text-blue-500/70">(peak {{ telem_span }}: {{ tx_peak }})</span>
-        </div>
-        <div class="font-semibold whitespace-pre-wrap text-green-600/70 dark:text-green-400/90">
-          Rx: {{ rx_avg }} <span class="text-green-400/50 dark:text-green-500/70">(peak {{ telem_span }}: {{ rx_peak }})</span>
+      <div class="font-semibold whitespace-pre-wrap text-blue-600/70 dark:text-blue-400/90">
+        Tx: {{ tx_avg }} <span class="text-blue-400/50 dark:text-blue-500/70">(peak {{ telem_span }}: {{ tx_peak }})</span>
+      </div>
+      <div class="font-semibold whitespace-pre-wrap text-green-600/70 dark:text-green-400/90">
+        Rx: {{ rx_avg }} <span class="text-green-400/50 dark:text-green-500/70">(peak {{ telem_span }}: {{ rx_peak }})</span>
         </div>
       </div>
     </div>
@@ -411,7 +411,7 @@ export default {
         this.trafficChart.options.labels.fillStyle = isDarkMode ? 'rgba(209, 213, 219, 0.9)' : 'rgba(80, 80, 80, 0.9)';
         if (this.trafficChart.options.tooltipLine) {
           this.trafficChart.options.tooltipLine.strokeStyle = isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.3)';
-        }
+      }
         this.trafficChart.render();
       }
       

@@ -44,9 +44,27 @@
               </button>
               <button
                   class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button flex items-center"
+                  @click="settingsDropdownOpen = false; dialogId = 'routing-table';">
+                <Route :size="16" class="mr-2" />
+                <span>Routing Table</span>
+              </button>
+              <button
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button flex items-center"
+                  @click="settingsDropdownOpen = false; dialogId = 'diagnostics';">
+                <Stethoscope :size="16" class="mr-2" />
+                <span>Diagnostics</span>
+              </button>
+              <button
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button flex items-center"
                   @click="settingsDropdownOpen = false; dialogId = 'api-reference';">
                 <Code :size="16" class="mr-2" />
                 <span>API Reference</span>
+              </button>
+              <button
+                  class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button flex items-center border-t border-divider"
+                  @click="settingsDropdownOpen = false; dialogId = 'change-password';">
+                <KeyRound :size="16" class="mr-2" />
+                <span>Change Password</span>
               </button>
               <button
                   class="block w-full text-left px-3 py-2 text-sm text-primary hover:bg-button rounded-b-md flex items-center"
@@ -283,6 +301,28 @@
         @close="dialogId = ''">
     </logs-dialog>
 
+    <!-- Dialog: Routing Table -->
+    <routing-table-dialog
+        v-if="dialogId === 'routing-table'"
+        :api="api"
+        @close="dialogId = ''">
+    </routing-table-dialog>
+
+    <!-- Dialog: Diagnostics -->
+    <diagnostics-dialog
+        v-if="dialogId === 'diagnostics'"
+        :api="api"
+        :peers="network.peers"
+        @close="dialogId = ''">
+    </diagnostics-dialog>
+
+    <!-- Dialog: Change Password -->
+    <change-password-dialog
+        v-if="dialogId === 'change-password'"
+        :api="api"
+        @close="dialogId = ''">
+    </change-password-dialog>
+
   </div>
 </template>
 
@@ -299,9 +339,12 @@ import InitWizard from "@/src/components/init-wizard.vue";
 import SystemHealthCard from "@/src/components/cards/SystemHealthCard.vue";
 import ControlCenterCard from "@/src/components/cards/ControlCenterCard.vue";
 import TrafficAnalysisCard from "@/src/components/cards/TrafficAnalysisCard.vue";
-import { Settings, LogOut, Router, Network, Plus, Sun, Moon, Code, ScrollText } from 'lucide-vue-next';
+import { Settings, LogOut, Router, Network, Plus, Sun, Moon, Code, ScrollText, Route, Stethoscope, KeyRound } from 'lucide-vue-next';
 import ApiReferenceDialog from "@/src/components/dialogs/api-reference-dialog.vue";
 import LogsDialog from "@/src/components/dialogs/logs-dialog.vue";
+import RoutingTableDialog from "@/src/components/dialogs/routing-table-dialog.vue";
+import DiagnosticsDialog from "@/src/components/dialogs/diagnostics-dialog.vue";
+import ChangePasswordDialog from "@/src/components/dialogs/change-password-dialog.vue";
 
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -334,8 +377,14 @@ export default {
     Moon,
     Code,
     ScrollText,
+    Route,
+    Stethoscope,
+    KeyRound,
     ApiReferenceDialog,
-    LogsDialog
+    LogsDialog,
+    RoutingTableDialog,
+    DiagnosticsDialog,
+    ChangePasswordDialog
   },
   data() {
     return {
